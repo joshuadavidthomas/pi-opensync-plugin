@@ -281,7 +281,7 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
   });
 }
 
-function registerConfigCommand(pi: ExtensionAPI, currentConfig: Config | null, client: SyncClient | null) {
+function registerConfigCommand(pi: ExtensionAPI, currentConfig: Config | null, _client: SyncClient | null) {
   pi.registerCommand("opensync-config", {
     description: "Configure OpenSync sync settings",
     handler: async (_args, ctx) => {

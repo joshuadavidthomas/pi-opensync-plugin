@@ -136,11 +136,11 @@ export class ConfigSelectorComponent {
         label: "API Key",
         description: "Your OpenSync API key (osk_...)",
         currentValue: this.apiKey.slice(0, 12) + "...",
-        submenu: (current, done) => {
+        submenu: (_current, done) => {
           return createTextInputSubmenu(
             "API Key",
             "Enter your OpenSync API key",
-            this.apiKey, // Use full key for editing
+            this.apiKey, // Use full key for editing (not the truncated '_current')
             (value) => {
               this.apiKey = value;
               done(value.slice(0, 12) + "...");
