@@ -201,6 +201,23 @@ export function extractThinkingParts(content: AssistantContentPart[]): MessagePa
 }
 
 /**
+ * Extract tool results as structured parts for OpenSync
+ */
+export function extractToolResultParts(toolResult: ToolResultMessageLike): MessagePart[] {
+  // Extract text from tool result content (skip images)
+  const textParts = toolResult.content
+    .filter((part): part is TextContent => part.type === "text")
+    .map(part => part.text);
+  
+  const resultText = textParts.join("\n");
+  
+  return [{
+    type: "tool-result",
+    content: resultText,
+  }];
+}
+
+/**
  * Transform a user input to OpenSync message payload
  */
 export function transformUserMessage(
@@ -225,7 +242,8 @@ export function transformAssistantMessage(
   sessionId: string,
   messageId: string,
   message: AssistantMessageLike,
-  includeThinking: boolean = false
+  includeThinking: boolean = false,
+  toolResults: ToolResultMessageLike[] = []
 ): MessagePayload {
   const textContent = extractAssistantMessageText(message.content, includeThinking);
   
@@ -243,15 +261,16 @@ export function transformAssistantMessage(
     payload.completionTokens = message.usage.output;
   }
   
-  // Add structured parts for tool calls and thinking
+  // Add structured parts for tool calls, tool results, and thinking
   const parts: MessagePart[] = [];
   
-  // If there's text content AND we have tool calls/thinking, add text as a part first
+  // If there's text content AND we have tool calls/thinking/results, add text as a part first
   // This works around OpenSync UI limitation where it only renders parts OR textContent, not both
   const toolCallParts = extractToolCallParts(message.content);
   const thinkingParts = includeThinking ? extractThinkingParts(message.content) : [];
+  const toolResultParts = toolResults.flatMap(result => extractToolResultParts(result));
   
-  if (textContent && (toolCallParts.length > 0 || thinkingParts.length > 0)) {
+  if (textContent && (toolCallParts.length > 0 || thinkingParts.length > 0 || toolResultParts.length > 0)) {
     parts.push({
       type: "text",
       content: textContent,
@@ -260,6 +279,7 @@ export function transformAssistantMessage(
   
   parts.push(...toolCallParts);
   parts.push(...thinkingParts);
+  parts.push(...toolResultParts);
   
   if (parts.length > 0) {
     payload.parts = parts;
@@ -268,33 +288,4 @@ export function transformAssistantMessage(
   return payload;
 }
 
-/**
- * Transform a tool result to OpenSync message payload (when syncToolCalls is enabled)
- */
-export function transformToolResultMessage(
-  sessionId: string,
-  messageId: string,
-  toolResult: ToolResultMessageLike,
-  timestamp: number = Date.now()
-): MessagePayload {
-  // Extract text from tool result content (skip images)
-  const textParts = toolResult.content
-    .filter((part): part is TextContent => part.type === "text")
-    .map(part => part.text);
-  
-  const resultText = textParts.join("\n");
-  
-  return {
-    sessionExternalId: sessionId,
-    externalId: messageId,
-    role: "tool",
-    textContent: `[${toolResult.toolName}]\n${resultText}`,
-    createdAt: timestamp,
-    parts: [
-      {
-        type: "tool-result",
-        content: resultText,
-      },
-    ],
-  };
-}
+

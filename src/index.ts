@@ -15,7 +15,6 @@ import {
   transformSession,
   transformUserMessage,
   transformAssistantMessage,
-  transformToolResultMessage,
   extractUserMessageText,
   countToolCalls,
 } from "./transform.js";
@@ -257,34 +256,18 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
       state = incrementToolCallCount(state, toolCalls);
     }
     
-    // Sync assistant message
+    // Sync assistant message with tool results included as parts (if enabled)
+    const toolResults = (config.syncToolCalls !== false) ? event.toolResults as ToolResultMessage[] : [];
     const payload = transformAssistantMessage(
       state.externalId,
       messageId,
       assistantMsg,
-      config.syncThinking
+      config.syncThinking,
+      toolResults
     );
     const msgResult = await client.syncMessage(payload);
     if (!msgResult.success) {
       notifyError(ctx, `Failed to sync assistant message: ${msgResult.error}`);
-    }
-    
-    // Sync tool results
-    if (config.syncToolCalls !== false && event.toolResults.length > 0) {
-      for (const toolResult of event.toolResults) {
-        state = incrementMessageCount(state);
-        const toolMsgId = generateMessageId(state.externalId, state.messageCount, "tool");
-        
-        const toolPayload = transformToolResultMessage(
-          state.externalId,
-          toolMsgId,
-          toolResult as ToolResultMessage
-        );
-        const toolSyncResult = await client.syncMessage(toolPayload);
-        if (!toolSyncResult.success) {
-          notifyError(ctx, `Failed to sync tool result: ${toolSyncResult.error}`);
-        }
-      }
     }
     
     // Update session with current totals

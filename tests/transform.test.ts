@@ -9,7 +9,6 @@ import {
   extractThinkingParts,
   transformUserMessage,
   transformAssistantMessage,
-  transformToolResultMessage,
 } from "../src/transform.js";
 import { createSessionState } from "../src/state.js";
 
@@ -378,32 +377,35 @@ describe("transformAssistantMessage", () => {
     expect(payload.parts![1].type).toBe("tool-call");
     expect(payload.parts![2].type).toBe("thinking");
   });
-});
-
-describe("transformToolResultMessage", () => {
-  it("creates tool result message payload with parts", () => {
-    const toolResult = {
-      role: "toolResult" as const,
-      toolName: "read",
-      content: [{ type: "text" as const, text: "file contents here" }],
+  
+  it("includes tool results when provided", () => {
+    const message = {
+      role: "assistant" as const,
+      content: [
+        { type: "text" as const, text: "Let me read that file" },
+        { type: "toolCall" as const, id: "tc1", name: "read", arguments: { path: "test.txt" } },
+      ],
+      model: "claude-sonnet-4-5",
+      timestamp: 1706400000000,
     };
     
-    const payload = transformToolResultMessage(
-      "session-123",
-      "msg-3",
-      toolResult,
-      1706400000000
-    );
+    const toolResults = [
+      {
+        role: "toolResult" as const,
+        toolName: "read",
+        content: [{ type: "text" as const, text: "file contents here" }],
+      },
+    ];
     
-    expect(payload.sessionExternalId).toBe("session-123");
-    expect(payload.externalId).toBe("msg-3");
-    expect(payload.role).toBe("tool");
-    expect(payload.textContent).toBe("[read]\nfile contents here");
-    expect(payload.createdAt).toBe(1706400000000);
-    expect(payload.parts).toHaveLength(1);
-    expect(payload.parts![0]).toEqual({
-      type: "tool-result",
-      content: "file contents here",
-    });
+    const payload = transformAssistantMessage("session-123", "msg-2", message, false, toolResults);
+    
+    // Text + tool call + tool result = 3 parts
+    expect(payload.parts).toHaveLength(3);
+    expect(payload.parts![0].type).toBe("text");
+    expect(payload.parts![1].type).toBe("tool-call");
+    expect(payload.parts![2].type).toBe("tool-result");
+    expect(payload.parts![2].content).toBe("file contents here");
   });
 });
+
+

@@ -2,6 +2,10 @@
 
 This document describes workarounds implemented in pi-sync to handle limitations in the OpenSync dashboard UI.
 
+## Summary
+
+Both workarounds are about ensuring content is visible in the OpenSync UI, which has an either/or rendering pattern for `textContent` vs `parts`.
+
 ## Issue 1: Text Content Not Rendering with Parts
 
 **Problem:** OpenSync UI (`SessionViewer.tsx`) has an either/or rendering logic:
@@ -73,7 +77,53 @@ Now the UI renders both the text AND the tool call.
 </>
 ```
 
-## Issue 2: Thinking Parts Not Rendering
+## Issue 2: Tool Results as Separate Messages
+
+**Problem:** Initially, we synced tool results as separate messages with `role: "tool"`. This caused them to appear as separate message bubbles below the assistant's response in the UI, breaking the visual grouping of a single "turn".
+
+**Example (old approach):**
+```
+Assistant: "Let me read that file" [tool call badge]
+
+↓ (separate bubble)
+
+Tool result: "file contents here"
+```
+
+**Solution:** Include tool results as parts of the assistant message instead of separate messages. This matches Claude Code plugin behavior and keeps the turn grouped together.
+
+```typescript
+// In index.ts turn_end handler
+const toolResults = (config.syncToolCalls !== false) ? event.toolResults : [];
+const payload = transformAssistantMessage(
+  state.externalId,
+  messageId,
+  assistantMsg,
+  config.syncThinking,
+  toolResults  // Pass tool results to be included as parts
+);
+```
+
+**Result:**
+```json
+{
+  "role": "assistant",
+  "textContent": "Let me read that file",
+  "parts": [
+    {"type": "text", "content": "Let me read that file"},
+    {"type": "tool-call", "content": {"toolName": "read", ...}},
+    {"type": "tool-result", "content": "file contents here"}
+  ]
+}
+```
+
+Now everything appears in one message bubble! ✅
+
+**Related Files:**
+- Implementation: `src/index.ts` (turn_end handler), `src/transform.ts` (transformAssistantMessage, extractToolResultParts)
+- Tests: `tests/transform.test.ts`
+
+## Issue 3: Thinking Parts Not Rendering
 
 **Problem:** OpenSync UI doesn't have a renderer for `{type: "thinking"}` parts.
 
@@ -98,7 +148,7 @@ if (part.type === "thinking") {
 }
 ```
 
-## Issue 3: Missing "pi" Source Display
+## Issue 4: Missing "pi" Source Display
 
 **Problem:** OpenSync doesn't recognize "pi" as a source, displays as "opencode" instead.
 
