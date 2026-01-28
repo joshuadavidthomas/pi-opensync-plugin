@@ -243,13 +243,13 @@ describe("loadConfig with environment variables", () => {
 ## Success Criteria:
 
 ### Automated Verification:
-- [ ] `bun test tests/config.test.ts` passes
-- [ ] `bun run typecheck` passes
+- [x] `bun test tests/config.test.ts` passes
+- [x] `bun run typecheck` passes
 
 ### Manual Verification:
-- [ ] Setting `PI_OPENSYNC_CONVEX_URL` and `PI_OPENSYNC_API_KEY` env vars loads config
-- [ ] Creating `~/.config/pi-opensync-plugin/config.json` manually loads config
-- [ ] `/opensync-config` shows config info or setup instructions
+- [x] Setting `PI_OPENSYNC_CONVEX_URL` and `PI_OPENSYNC_API_KEY` env vars loads config
+- [x] Creating `~/.config/pi-opensync-plugin/config.json` manually loads config
+- [x] `/opensync-config` shows config info or setup instructions
 
 ### Commit Checkpoint:
 After all verifications pass, commit with message:

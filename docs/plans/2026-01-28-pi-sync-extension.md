@@ -123,7 +123,7 @@ For production use, users will clone/copy to `~/.pi/agent/extensions/pi-opensync
 | Phase | Description | File | Status |
 |-------|-------------|------|--------|
 | 1 | Project Setup & Core Types | [phase01.md](./2026-01-28-pi-sync-extension-phase01.md) | ✅ Complete |
-| 2 | Configuration Management | [phase02.md](./2026-01-28-pi-sync-extension-phase02.md) | Planned |
+| 2 | Configuration Management | [phase02.md](./2026-01-28-pi-sync-extension-phase02.md) | ✅ Complete |
 | 3 | OpenSync API Client | [phase03.md](./2026-01-28-pi-sync-extension-phase03.md) | Planned |
 | 4 | State Management & Data Transformation | [phase04.md](./2026-01-28-pi-sync-extension-phase04.md) | Planned |
 | 5 | Session Lifecycle & Message Event Handlers | [phase05.md](./2026-01-28-pi-sync-extension-phase05.md) | Planned |
