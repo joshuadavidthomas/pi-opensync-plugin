@@ -182,6 +182,24 @@ export function extractToolCallParts(content: AssistantContentPart[]): MessagePa
 }
 
 /**
+ * Extract thinking/reasoning as structured parts for OpenSync
+ */
+export function extractThinkingParts(content: AssistantContentPart[]): MessagePart[] {
+  const parts: MessagePart[] = [];
+  
+  for (const part of content) {
+    if (part.type === "thinking") {
+      parts.push({
+        type: "thinking",
+        content: part.thinking,
+      });
+    }
+  }
+  
+  return parts;
+}
+
+/**
  * Transform a user input to OpenSync message payload
  */
 export function transformUserMessage(
@@ -224,10 +242,19 @@ export function transformAssistantMessage(
     payload.completionTokens = message.usage.output;
   }
   
-  // Add structured parts for tool calls
+  // Add structured parts for tool calls and thinking
+  const parts: MessagePart[] = [];
+  
   const toolCallParts = extractToolCallParts(message.content);
-  if (toolCallParts.length > 0) {
-    payload.parts = toolCallParts;
+  parts.push(...toolCallParts);
+  
+  if (includeThinking) {
+    const thinkingParts = extractThinkingParts(message.content);
+    parts.push(...thinkingParts);
+  }
+  
+  if (parts.length > 0) {
+    payload.parts = parts;
   }
   
   return payload;

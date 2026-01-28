@@ -6,6 +6,7 @@ import {
   extractAssistantMessageText,
   countToolCalls,
   extractToolCallParts,
+  extractThinkingParts,
   transformUserMessage,
   transformAssistantMessage,
   transformToolResultMessage,
@@ -202,6 +203,33 @@ describe("extractToolCallParts", () => {
   });
 });
 
+describe("extractThinkingParts", () => {
+  it("extracts thinking as structured parts", () => {
+    const content = [
+      { type: "thinking" as const, thinking: "Let me analyze this..." },
+      { type: "text" as const, text: "The answer is 42" },
+      { type: "thinking" as const, thinking: "This makes sense because..." },
+    ];
+    
+    const parts = extractThinkingParts(content);
+    
+    expect(parts).toHaveLength(2);
+    expect(parts[0]).toEqual({
+      type: "thinking",
+      content: "Let me analyze this...",
+    });
+    expect(parts[1]).toEqual({
+      type: "thinking",
+      content: "This makes sense because...",
+    });
+  });
+  
+  it("returns empty array when no thinking", () => {
+    const content = [{ type: "text" as const, text: "Hello" }];
+    expect(extractThinkingParts(content)).toEqual([]);
+  });
+});
+
 describe("transformUserMessage", () => {
   it("creates user message payload", () => {
     const payload = transformUserMessage(
@@ -280,6 +308,63 @@ describe("transformAssistantMessage", () => {
         args: { path: "test.txt" },
       },
     });
+  });
+  
+  it("includes thinking parts when includeThinking is true", () => {
+    const message = {
+      role: "assistant" as const,
+      content: [
+        { type: "thinking" as const, thinking: "Let me analyze..." },
+        { type: "text" as const, text: "The answer is 42" },
+      ],
+      model: "claude-sonnet-4-5",
+      timestamp: 1706400000000,
+    };
+    
+    const payload = transformAssistantMessage("session-123", "msg-2", message, true);
+    
+    expect(payload.textContent).toBe("<thinking>Let me analyze...</thinking>\nThe answer is 42");
+    expect(payload.parts).toHaveLength(1);
+    expect(payload.parts![0]).toEqual({
+      type: "thinking",
+      content: "Let me analyze...",
+    });
+  });
+  
+  it("excludes thinking parts when includeThinking is false", () => {
+    const message = {
+      role: "assistant" as const,
+      content: [
+        { type: "thinking" as const, thinking: "Let me analyze..." },
+        { type: "text" as const, text: "The answer is 42" },
+      ],
+      model: "claude-sonnet-4-5",
+      timestamp: 1706400000000,
+    };
+    
+    const payload = transformAssistantMessage("session-123", "msg-2", message, false);
+    
+    expect(payload.textContent).toBe("The answer is 42");
+    expect(payload.parts).toBeUndefined();
+  });
+  
+  it("combines tool call and thinking parts", () => {
+    const message = {
+      role: "assistant" as const,
+      content: [
+        { type: "thinking" as const, thinking: "I should read this file" },
+        { type: "text" as const, text: "Let me check that" },
+        { type: "toolCall" as const, id: "tc1", name: "read", arguments: { path: "test.txt" } },
+      ],
+      model: "claude-sonnet-4-5",
+      timestamp: 1706400000000,
+    };
+    
+    const payload = transformAssistantMessage("session-123", "msg-2", message, true);
+    
+    expect(payload.parts).toHaveLength(2);
+    expect(payload.parts![0].type).toBe("tool-call");
+    expect(payload.parts![1].type).toBe("thinking");
   });
 });
 
