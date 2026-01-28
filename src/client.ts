@@ -1,12 +1,18 @@
-import type { Config, SessionPayload, MessagePayload, SyncResult } from "./types";
+import type { SessionPayload, MessagePayload, SyncResult } from "./types";
 import { debugLog } from "./debug";
+
+export interface ClientConfig {
+  convexUrl: string;
+  apiKey: string;
+  debug?: boolean;
+}
 
 export class SyncClient {
   private siteUrl: string;
   private apiKey: string;
   private debug: boolean;
 
-  constructor(config: Config) {
+  constructor(config: ClientConfig) {
     this.siteUrl = config.convexUrl;
     this.apiKey = config.apiKey;
     this.debug = config.debug ?? false;

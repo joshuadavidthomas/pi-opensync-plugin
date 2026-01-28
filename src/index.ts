@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { AssistantMessage, UserMessage, ToolResultMessage } from "@mariozechner/pi-ai";
-import { loadConfig, ConfigSelectorComponent } from "./config";
+import { Config, loadConfig, ConfigSelectorComponent } from "./config";
 import { SyncClient } from "./client";
 import { debugLog } from "./debug";
 import {
@@ -18,7 +18,7 @@ import {
   extractUserMessageText,
   countToolCalls,
 } from "./transform";
-import type { SessionState, Config, MessagePayload } from "./types";
+import type { SessionState, MessagePayload } from "./types";
 
 export default function piOpensyncPlugin(pi: ExtensionAPI) {
   const config = loadConfig();

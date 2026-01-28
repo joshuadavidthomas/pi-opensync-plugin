@@ -1,3 +1,7 @@
+/**
+ * Configuration management for pi-opensync-plugin
+ */
+
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -12,11 +16,77 @@ import {
 } from "@mariozechner/pi-tui";
 import { getSettingsListTheme, DynamicBorder } from "@mariozechner/pi-coding-agent";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
-import type { Config } from "./types";
 import { SyncClient } from "./client";
 
 const CONFIG_DIR = join(homedir(), ".config", "pi-opensync-plugin");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
+
+/**
+ * Configuration class for pi-opensync-plugin
+ */
+export class Config {
+  convexUrl: string;
+  apiKey: string;
+  autoSync: boolean;
+  syncToolCalls: boolean;
+  syncThinking: boolean;
+  debug: boolean;
+
+  constructor(data?: Partial<Config>) {
+    this.convexUrl = data?.convexUrl ?? "https://your-app.convex.cloud";
+    this.apiKey = data?.apiKey ?? "osk_";
+    this.autoSync = data?.autoSync ?? true;
+    this.syncToolCalls = data?.syncToolCalls ?? true;
+    this.syncThinking = data?.syncThinking ?? false;
+    this.debug = data?.debug ?? false;
+  }
+
+  /**
+   * Update a config field
+   */
+  set(field: keyof Config, value: string | boolean): void {
+    switch (field) {
+      case "convexUrl":
+      case "apiKey":
+        if (typeof value === "string") {
+          this[field] = value;
+        }
+        break;
+      case "autoSync":
+      case "syncToolCalls":
+      case "syncThinking":
+      case "debug":
+        if (typeof value === "boolean") {
+          this[field] = value;
+        }
+        break;
+    }
+  }
+
+  /**
+   * Convert to plain object for JSON serialization
+   */
+  toJSON() {
+    return {
+      convexUrl: this.convexUrl,
+      apiKey: this.apiKey,
+      autoSync: this.autoSync,
+      syncToolCalls: this.syncToolCalls,
+      syncThinking: this.syncThinking,
+      debug: this.debug,
+    };
+  }
+
+  /**
+   * Create Config from plain object
+   */
+  static fromJSON(data: unknown): Config {
+    if (typeof data !== "object" || data === null) {
+      throw new Error("Invalid config data");
+    }
+    return new Config(data as Partial<Config>);
+  }
+}
 
 /**
  * Normalize Convex URL to use .convex.site for HTTP endpoints
@@ -30,25 +100,35 @@ export function normalizeConvexUrl(url: string): string {
  * Environment variables take precedence
  */
 export function loadConfig(): Config | null {
+  // Check environment variables first
   const envUrl = process.env.PI_OPENSYNC_CONVEX_URL;
   const envKey = process.env.PI_OPENSYNC_API_KEY;
-
+  
   if (envUrl && envKey) {
-    return {
+    const config = new Config({
       convexUrl: normalizeConvexUrl(envUrl),
       apiKey: envKey,
       autoSync: process.env.PI_OPENSYNC_AUTO_SYNC !== "false",
       syncToolCalls: process.env.PI_OPENSYNC_TOOL_CALLS !== "false",
       syncThinking: process.env.PI_OPENSYNC_THINKING === "true",
       debug: process.env.PI_OPENSYNC_DEBUG === "true",
-    };
+    });
+    return config;
   }
-
+  
   // Fall back to config file
+  return loadConfigFile();
+}
+
+/**
+ * Load configuration from file only
+ */
+export function loadConfigFile(): Config | null {
   try {
     if (existsSync(CONFIG_FILE)) {
       const data = readFileSync(CONFIG_FILE, "utf-8");
-      const config = JSON.parse(data) as Config;
+      const parsed = JSON.parse(data);
+      const config = Config.fromJSON(parsed);
       config.convexUrl = normalizeConvexUrl(config.convexUrl);
       return config;
     }
@@ -65,7 +145,14 @@ export function saveConfig(config: Config): void {
   if (!existsSync(CONFIG_DIR)) {
     mkdirSync(CONFIG_DIR, { recursive: true });
   }
-  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+  writeFileSync(CONFIG_FILE, JSON.stringify(config.toJSON(), null, 2));
+}
+
+/**
+ * Get config file path (for display purposes)
+ */
+export function getConfigPath(): string {
+  return CONFIG_FILE;
 }
 
 /**
@@ -86,11 +173,11 @@ function createTextInputSubmenu(
   onSave: (value: string) => void,
   onCancel: () => void
 ) {
-
+  
   const container = new Container();
   const input = new Input();
   input.setValue(initialValue);
-
+  
   container.addChild(new Spacer(1));
   container.addChild(new Text(title, 1, 0));
   if (description) {
@@ -102,9 +189,9 @@ function createTextInputSubmenu(
   container.addChild(new Spacer(1));
   container.addChild(new Text("enter to save • esc to cancel", 1, 0));
   container.addChild(new Spacer(1));
-
+  
   let isFocused = false;
-
+  
   return {
     render(width: number) {
       return container.render(width);
@@ -145,24 +232,15 @@ export class ConfigSelectorComponent {
   private settingsList: typeof SettingsList.prototype;
   private ctx: ExtensionContext;
   private config: Config;
-
+  
   constructor(
     currentConfig: Config | null,
     ctx: ExtensionContext,
     callbacks: ConfigSelectorCallbacks
   ) {
     this.ctx = ctx;
-
-    // Initialize config state from current or defaults
-    this.config = {
-      convexUrl: currentConfig?.convexUrl ?? "https://your-app.convex.cloud",
-      apiKey: currentConfig?.apiKey ?? "osk_",
-      autoSync: currentConfig?.autoSync ?? true,
-      syncToolCalls: currentConfig?.syncToolCalls !== false, // defaults to true
-      syncThinking: currentConfig?.syncThinking ?? false,
-      debug: currentConfig?.debug ?? false,
-    };
-
+    this.config = currentConfig ?? new Config();
+    
     // Build settings items
     const items: SettingItem[] = [
       {
@@ -176,7 +254,7 @@ export class ConfigSelectorComponent {
             "Enter your OpenSync Convex URL",
             current,
             (value) => {
-              this.config.convexUrl = value;
+              this.config.set("convexUrl", value);
               done(value);
             },
             () => done()
@@ -194,7 +272,7 @@ export class ConfigSelectorComponent {
             "Enter your OpenSync API key",
             this.config.apiKey, // Use full key for editing (not the truncated '_current')
             (value) => {
-              this.config.apiKey = value;
+              this.config.set("apiKey", value);
               done(value.slice(0, 12) + "...");
             },
             () => done()
@@ -230,11 +308,11 @@ export class ConfigSelectorComponent {
         values: ["true", "false"],
       },
     ];
-
+    
     // Build component tree
     this.container = new Container();
     this.container.addChild(new DynamicBorder((s: string) => s));
-
+    
     this.settingsList = new SettingsList(
       items,
       Math.min(items.length + 2, 15),
@@ -247,47 +325,48 @@ export class ConfigSelectorComponent {
       },
       { enableSearch: true }
     );
-
+    
     this.container.addChild(this.settingsList);
     this.container.addChild(new DynamicBorder((s: string) => s));
   }
-
+  
   private handleValueChange(id: string, newValue: string): void {
+    const boolValue = newValue === "true";
     switch (id) {
       case "auto-sync":
-        this.config.autoSync = newValue === "true";
+        this.config.set("autoSync", boolValue);
         break;
       case "sync-tool-calls":
-        this.config.syncToolCalls = newValue === "true";
+        this.config.set("syncToolCalls", boolValue);
         break;
       case "sync-thinking":
-        this.config.syncThinking = newValue === "true";
+        this.config.set("syncThinking", boolValue);
         break;
       case "debug":
-        this.config.debug = newValue === "true";
+        this.config.set("debug", boolValue);
         break;
     }
   }
-
+  
   private async handleClose(onClose: () => void): Promise<void> {
     // Prompt to save
     const save = await this.ctx.ui.confirm(
       "Save Configuration",
       "Save changes to OpenSync configuration?"
     );
-
+    
     if (!save) {
       onClose();
       return;
     }
-
+    
     // Test connection
     const testClient = new SyncClient({
-      ...this.config,
+      ...this.config.toJSON(),
       convexUrl: this.config.convexUrl.replace(".convex.cloud", ".convex.site"),
     });
     const testResult = await testClient.testConnection();
-
+    
     if (!testResult.success) {
       const proceed = await this.ctx.ui.confirm(
         "Connection Failed",
@@ -299,7 +378,7 @@ export class ConfigSelectorComponent {
         return;
       }
     }
-
+    
     // Save
     try {
       saveConfig(this.config);
@@ -313,15 +392,15 @@ export class ConfigSelectorComponent {
     
     onClose();
   }
-
+  
   render(width: number): string[] {
     return this.container.render(width);
   }
-
+  
   invalidate(): void {
     this.container.invalidate();
   }
-
+  
   handleInput(data: string): void {
     this.settingsList.handleInput?.(data);
   }

@@ -1,22 +1,4 @@
 /**
- * Configuration for pi-opensync-plugin extension
- */
-export interface Config {
-  /** OpenSync Convex URL (will be normalized to .convex.site) */
-  convexUrl: string;
-  /** OpenSync API key (osk_xxxxx) */
-  apiKey: string;
-  /** Enable auto-sync (default: true) */
-  autoSync?: boolean;
-  /** Sync tool calls as separate messages (default: true) */
-  syncToolCalls?: boolean;
-  /** Include thinking/reasoning content in messages (default: false) */
-  syncThinking?: boolean;
-  /** Enable debug logging (default: false) */
-  debug?: boolean;
-}
-
-/**
  * Session data for OpenSync API
  */
 export interface SessionPayload {

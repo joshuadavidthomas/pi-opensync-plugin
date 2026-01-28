@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { SyncClient } from "../src/client";
-import type { Config, SessionPayload, MessagePayload } from "../src/types";
+import type { SessionPayload, MessagePayload } from "../src/types";
+import type { ClientConfig } from "../src/client";
 
 describe("SyncClient", () => {
-  const mockConfig: Config = {
+  const mockConfig: ClientConfig = {
     convexUrl: "https://test.convex.site",
     apiKey: "osk_test123",
     debug: false,
