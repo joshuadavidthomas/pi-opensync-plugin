@@ -1,4 +1,5 @@
 import type { Config, SessionPayload, MessagePayload, SyncResult } from "./types.js";
+import { debugLog } from "./debug.js";
 
 export class SyncClient {
   private siteUrl: string;
@@ -11,18 +12,20 @@ export class SyncClient {
     this.debug = config.debug ?? false;
   }
   
-  private log(...args: unknown[]): void {
+  private log(entry: Record<string, unknown>): void {
     if (this.debug) {
-      console.log("[pi-opensync]", ...args);
+      debugLog(entry);
     }
   }
   
   private async request<T>(endpoint: string, data: unknown): Promise<SyncResult & { data?: T }> {
     const url = `${this.siteUrl}${endpoint}`;
     
-    if (this.debug) {
-      this.log(`→ ${endpoint}`);
-    }
+    this.log({
+      type: "request",
+      endpoint,
+      payload: data,
+    });
     
     try {
       const response = await fetch(url, {
@@ -36,18 +39,29 @@ export class SyncClient {
       
       if (!response.ok) {
         const text = await response.text();
-        this.log(`✗ ${endpoint} ${response.status}:`, text);
+        this.log({
+          type: "error",
+          endpoint,
+          status: response.status,
+          error: text,
+        });
         return { success: false, error: `${response.status}: ${text}` };
       }
       
       const result = await response.json() as T;
-      if (this.debug) {
-        this.log(`✓ ${endpoint}`);
-      }
+      this.log({
+        type: "success",
+        endpoint,
+        response: result,
+      });
       return { success: true, data: result };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.log(`✗ ${endpoint}:`, message);
+      this.log({
+        type: "exception",
+        endpoint,
+        error: message,
+      });
       return { success: false, error: message };
     }
   }

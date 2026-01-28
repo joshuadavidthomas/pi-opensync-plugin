@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 import type { AssistantMessage, UserMessage, ToolResultMessage } from "@mariozechner/pi-ai";
 import { loadConfig, getConfigPath } from "./config.js";
 import { SyncClient } from "./client.js";
+import { debugLog } from "./debug.js";
 import {
   createSessionState,
   updateSessionUsage,
@@ -31,7 +32,7 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
   
   if (config.autoSync === false) {
     if (config.debug) {
-      console.log("[pi-opensync] Auto-sync disabled in config");
+      debugLog({ type: "init", message: "Auto-sync disabled in config" });
     }
     registerConfigCommand(pi, config, null);
     return;
@@ -40,9 +41,9 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
   const client = new SyncClient(config);
   let state: SessionState | null = null;
   
-  const log = (...args: unknown[]) => {
+  const log = (entry: Record<string, unknown>) => {
     if (config.debug) {
-      console.log("[pi-opensync]", ...args);
+      debugLog(entry);
     }
   };
   
@@ -50,7 +51,7 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
     if (config.debug && ctx.hasUI) {
       ctx.ui.notify(`[OpenSync] ${message}`, "error");
     }
-    log("Error:", message);
+    log({ type: "error", message });
   };
   
   // Register config command
@@ -65,7 +66,7 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
     const model = ctx.model ? { id: ctx.model.id, provider: ctx.model.provider } : undefined;
     
     state = createSessionState(sessionId, ctx.cwd, model);
-    log("Session started:", state.externalId);
+    log({ type: "session_start", sessionId: state.externalId });
     
     // Update status
     if (ctx.hasUI) {
@@ -93,7 +94,7 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
     const model = ctx.model ? { id: ctx.model.id, provider: ctx.model.provider } : undefined;
     
     state = createSessionState(sessionId, ctx.cwd, model, parentExternalId);
-    log("Session forked:", state.externalId, "from parent:", parentExternalId);
+    log({ type: "session_fork", sessionId: state.externalId, parentSessionId: parentExternalId });
     
     // Sync new forked session
     const sessionName = ctx.sessionManager.getSessionName();
@@ -145,7 +146,7 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
     state = { ...state, messageCount: msgCount };
     
     if (messages.length > 0) {
-      log("Syncing", messages.length, "existing messages to forked session");
+      log({ type: "batch_sync", messageCount: messages.length, reason: "fork" });
       await client.syncBatch([], messages);
     }
     
@@ -157,7 +158,7 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
   pi.on("session_shutdown", async (_event, ctx) => {
     if (!state) return;
     
-    log("Session shutdown:", state.externalId);
+    log({ type: "session_shutdown", sessionId: state.externalId });
     
     // Sync final session state
     const sessionName = ctx.sessionManager.getSessionName();
@@ -177,7 +178,7 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
     if (!state) return;
     
     state = updateModel(state, { id: event.model.id, provider: event.model.provider });
-    log("Model changed:", state.model);
+    log({ type: "model_change", model: state.model, provider: state.provider });
   });
   
   // ─────────────────────────────────────────────────────────────────────────────
@@ -191,7 +192,7 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
     state = incrementMessageCount(state);
     const messageId = generateMessageId(state.externalId, state.messageCount, "user");
     
-    log("User input:", messageId);
+    log({ type: "user_message", messageId, messageCount: state.messageCount });
     
     const payload = transformUserMessage(
       state.externalId,
@@ -216,7 +217,7 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
     state = incrementMessageCount(state);
     const messageId = generateMessageId(state.externalId, state.messageCount, "assistant");
     
-    log("Assistant message:", messageId);
+    log({ type: "assistant_message", messageId, messageCount: state.messageCount });
     
     // Update usage
     if (assistantMsg.usage) {
