@@ -1,7 +1,9 @@
 import type { SessionState, SessionPayload, MessagePayload } from "./types.js";
 
-// Type definitions for pi message content
-// These match the actual pi-ai types but are defined here to avoid import issues in tests
+// Minimal type definitions for message content
+// These capture only what we need for transformation, avoiding full pi-ai type complexity in tests
+// Real pi-ai objects satisfy these interfaces via structural typing
+
 interface TextContent {
   type: "text";
   text: string;
@@ -9,25 +11,27 @@ interface TextContent {
 
 interface ThinkingContent {
   type: "thinking";
-  text: string;
+  thinking: string;
 }
 
 interface ToolCallContent {
   type: "toolCall";
-  toolCallId: string;
-  toolName: string;
-  input: unknown;
+  id: string;
+  name: string;
+  arguments: unknown;
 }
 
 interface ImageContent {
   type: "image";
-  source: { type: "base64"; mediaType: string; data: string };
+  data: string;
+  mimeType: string;
 }
 
-type AssistantContentPart = TextContent | ThinkingContent | ToolCallContent;
 type UserContentPart = TextContent | ImageContent;
+type AssistantContentPart = TextContent | ThinkingContent | ToolCallContent;
 
-interface AssistantMessageLike {
+// Minimal message-like interfaces for what we actually use
+export interface AssistantMessageLike {
   role: "assistant";
   content: AssistantContentPart[];
   model: string;
@@ -38,10 +42,10 @@ interface AssistantMessageLike {
   };
 }
 
-interface ToolResultMessageLike {
+export interface ToolResultMessageLike {
   role: "toolResult";
   toolName: string;
-  content: Array<{ type: string; text?: string }>;
+  content: (TextContent | ImageContent)[];
 }
 
 /**
@@ -140,7 +144,8 @@ export function extractAssistantMessageText(
     if (part.type === "text") {
       parts.push(part.text);
     } else if (part.type === "thinking" && includeThinking) {
-      parts.push(`<thinking>${part.text}</thinking>`);
+      // ThinkingContent has 'thinking' property
+      parts.push(`<thinking>${part.thinking}</thinking>`);
     }
     // Skip toolCall parts - those are tracked separately
   }
@@ -152,7 +157,7 @@ export function extractAssistantMessageText(
  * Count tool calls in an assistant message
  */
 export function countToolCalls(content: AssistantContentPart[]): number {
-  return content.filter(part => part.type === "toolCall").length;
+  return content.filter((part): part is ToolCallContent => part.type === "toolCall").length;
 }
 
 /**
@@ -210,9 +215,9 @@ export function transformToolResultMessage(
   toolResult: ToolResultMessageLike,
   timestamp: number = Date.now()
 ): MessagePayload {
-  // Extract text from tool result content
+  // Extract text from tool result content (skip images)
   const textParts = toolResult.content
-    .filter((part): part is { type: "text"; text: string } => part.type === "text" && typeof part.text === "string")
+    .filter((part): part is TextContent => part.type === "text")
     .map(part => part.text);
   
   return {

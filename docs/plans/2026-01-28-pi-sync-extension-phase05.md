@@ -320,8 +320,8 @@ function registerConfigCommand(pi: ExtensionAPI, config: Config | null, client: 
 ## Success Criteria:
 
 ### Automated Verification:
-- [ ] `bun run typecheck` passes
-- [ ] `bun test` passes (all tests)
+- [x] `bun run typecheck` passes
+- [x] `bun test` passes (all tests)
 
 ### Manual Verification:
 - [ ] Start pi with extension loaded and valid config - session appears in OpenSync

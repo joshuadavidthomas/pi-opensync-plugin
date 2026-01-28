@@ -98,7 +98,7 @@ describe("extractUserMessageText", () => {
   it("extracts text from content array", () => {
     const content = [
       { type: "text" as const, text: "First" },
-      { type: "image" as const, source: { type: "base64" as const, mediaType: "image/png", data: "..." } },
+      { type: "image" as const, data: "base64data", mimeType: "image/png" },
       { type: "text" as const, text: "Second" },
     ];
     
@@ -122,7 +122,7 @@ describe("extractAssistantMessageText", () => {
   
   it("excludes thinking by default", () => {
     const content = [
-      { type: "thinking" as const, text: "Let me think..." },
+      { type: "thinking" as const, thinking: "Let me think..." },
       { type: "text" as const, text: "The answer is 42" },
     ];
     
@@ -131,7 +131,7 @@ describe("extractAssistantMessageText", () => {
   
   it("includes thinking when requested", () => {
     const content = [
-      { type: "thinking" as const, text: "Let me think..." },
+      { type: "thinking" as const, thinking: "Let me think..." },
       { type: "text" as const, text: "The answer is 42" },
     ];
     
@@ -143,7 +143,7 @@ describe("extractAssistantMessageText", () => {
   it("skips tool calls", () => {
     const content = [
       { type: "text" as const, text: "I will read the file" },
-      { type: "toolCall" as const, toolCallId: "tc1", toolName: "read", input: { path: "foo.txt" } },
+      { type: "toolCall" as const, id: "tc1", name: "read", arguments: { path: "foo.txt" } },
       { type: "text" as const, text: "Done" },
     ];
     
@@ -155,8 +155,8 @@ describe("countToolCalls", () => {
   it("counts tool calls in content", () => {
     const content = [
       { type: "text" as const, text: "Working..." },
-      { type: "toolCall" as const, toolCallId: "tc1", toolName: "read", input: {} },
-      { type: "toolCall" as const, toolCallId: "tc2", toolName: "write", input: {} },
+      { type: "toolCall" as const, id: "tc1", name: "read", arguments: {} },
+      { type: "toolCall" as const, id: "tc2", name: "write", arguments: {} },
     ];
     
     expect(countToolCalls(content)).toBe(2);
@@ -229,7 +229,7 @@ describe("transformToolResultMessage", () => {
     const toolResult = {
       role: "toolResult" as const,
       toolName: "read",
-      content: [{ type: "text", text: "file contents here" }],
+      content: [{ type: "text" as const, text: "file contents here" }],
     };
     
     const payload = transformToolResultMessage(

@@ -7,8 +7,8 @@
     "extensions": ["./src/index.ts"]
   },
   "scripts": {
-    "test": "bun test",
-    "test:watch": "bun test --watch",
+    "test": "bun test tests/",
+    "test:watch": "bun test tests/ --watch",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
