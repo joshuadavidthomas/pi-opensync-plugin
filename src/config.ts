@@ -86,6 +86,15 @@ export class Config {
     }
     return new Config(data as Partial<Config>);
   }
+
+  /**
+   * Create a test config with normalized URL for connection testing
+   */
+  getTestConfig(): Config {
+    const testConfig = new Config(this.toJSON());
+    testConfig.convexUrl = normalizeConvexUrl(testConfig.convexUrl);
+    return testConfig;
+  }
 }
 
 /**
@@ -360,10 +369,8 @@ export class ConfigSelectorComponent {
       return;
     }
     
-    // Test connection (create a temp config with normalized URL)
-    const testConfig = new Config(this.config.toJSON());
-    testConfig.convexUrl = testConfig.convexUrl.replace(".convex.cloud", ".convex.site");
-    const testClient = new SyncClient(testConfig);
+    // Test connection
+    const testClient = new SyncClient(this.config.getTestConfig());
     const testResult = await testClient.testConnection();
     
     if (!testResult.success) {
