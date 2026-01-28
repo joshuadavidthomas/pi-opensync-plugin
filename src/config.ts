@@ -95,6 +95,16 @@ export class Config {
     testConfig.convexUrl = normalizeConvexUrl(testConfig.convexUrl);
     return testConfig;
   }
+
+  /**
+   * Save configuration to file
+   */
+  save(): void {
+    if (!existsSync(CONFIG_DIR)) {
+      mkdirSync(CONFIG_DIR, { recursive: true });
+    }
+    writeFileSync(CONFIG_FILE, JSON.stringify(this.toJSON(), null, 2));
+  }
 }
 
 /**
@@ -145,16 +155,6 @@ export function loadConfigFile(): Config | null {
     console.error("[pi-opensync] Error loading config:", error);
   }
   return null;
-}
-
-/**
- * Save configuration to file
- */
-export function saveConfig(config: Config): void {
-  if (!existsSync(CONFIG_DIR)) {
-    mkdirSync(CONFIG_DIR, { recursive: true });
-  }
-  writeFileSync(CONFIG_FILE, JSON.stringify(config.toJSON(), null, 2));
 }
 
 /**
@@ -387,7 +387,7 @@ export class ConfigSelectorComponent {
     
     // Save
     try {
-      saveConfig(this.config);
+      this.config.save();
       this.ctx.ui.notify(
         `Config saved to ${CONFIG_FILE}\n\nRestart pi or use /reload to apply changes.`,
         "info"
