@@ -56,7 +56,7 @@ describe("loadConfig with environment variables", () => {
     expect(config!.apiKey).toBe("osk_test123");
     expect(config!.debug).toBe(true);
     expect(config!.autoSync).toBe(true); // default when not "false"
-    expect(config!.syncToolCalls).toBe(false); // default when not "true"
+    expect(config!.syncToolCalls).toBe(true);
   });
   
   it("returns null when no env vars and no config file", async () => {

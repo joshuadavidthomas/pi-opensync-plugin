@@ -27,7 +27,7 @@ export function loadConfig(): Config | null {
       convexUrl: normalizeConvexUrl(envUrl),
       apiKey: envKey,
       autoSync: process.env.PI_OPENSYNC_AUTO_SYNC !== "false",
-      syncToolCalls: process.env.PI_OPENSYNC_TOOL_CALLS === "true",
+      syncToolCalls: process.env.PI_OPENSYNC_TOOL_CALLS !== "false",
       syncThinking: process.env.PI_OPENSYNC_THINKING === "true",
       debug: process.env.PI_OPENSYNC_DEBUG === "true",
     };

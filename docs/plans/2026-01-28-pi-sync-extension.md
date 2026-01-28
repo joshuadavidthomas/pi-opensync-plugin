@@ -56,6 +56,15 @@ A fully functional pi extension that:
 - OAuth/browser-based authentication for OpenSync (API key only)
 - Provider authentication (handled by pi itself)
 
+## Upstream Contributions Needed
+
+After implementation is complete, we need to contribute back to OpenSync:
+
+- **Add "pi" as recognized source** - Currently displays as "opencode" in dashboard
+- Other improvements may be identified during testing and real-world usage
+
+These are tracked separately and don't block the extension implementation.
+
 ## Implementation Approach
 
 We're building the extension directly in this repository (`pi-sync`). We use pi's hot-reload feature via `/reload` command to test changes in the current session as we build.

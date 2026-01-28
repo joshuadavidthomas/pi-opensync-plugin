@@ -228,8 +228,8 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
     );
     await client.syncMessage(payload);
     
-    // Optionally sync tool results
-    if (config.syncToolCalls && event.toolResults.length > 0) {
+    // Sync tool results
+    if (config.syncToolCalls !== false && event.toolResults.length > 0) {
       for (const toolResult of event.toolResults) {
         state = incrementMessageCount(state);
         const toolMsgId = generateMessageId(state.externalId, state.messageCount, "tool");
@@ -273,7 +273,7 @@ function registerConfigCommand(pi: ExtensionAPI, config: Config | null, client: 
               `Convex URL: ${config.convexUrl}\n` +
               `API Key: ${config.apiKey.slice(0, 8)}...\n` +
               `Auto Sync: ${config.autoSync !== false}\n` +
-              `Sync Tool Calls: ${config.syncToolCalls ?? false}\n` +
+              `Sync Tool Calls: ${config.syncToolCalls !== false}\n` +
               `Sync Thinking: ${config.syncThinking ?? false}\n` +
               `Debug: ${config.debug ?? false}`,
               "info"

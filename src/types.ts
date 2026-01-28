@@ -8,7 +8,7 @@ export interface Config {
   apiKey: string;
   /** Enable auto-sync (default: true) */
   autoSync?: boolean;
-  /** Sync tool calls as separate messages (default: false) */
+  /** Sync tool calls as separate messages (default: true) */
   syncToolCalls?: boolean;
   /** Include thinking/reasoning content in messages (default: false) */
   syncThinking?: boolean;
