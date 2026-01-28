@@ -8,33 +8,33 @@ import {
   transformUserMessage,
   transformAssistantMessage,
 } from "../src/transform";
-import { createSessionState } from "../src/state";
+import { SessionState } from "../src/state";
 
 describe("generateSessionTitle", () => {
   it("returns 'Untitled' when no name and no parent", () => {
-    const state = createSessionState("s1", "/path");
+    const state = new SessionState("s1", "/path");
     expect(generateSessionTitle(state)).toBe("Untitled");
   });
   
   it("returns session name when no parent", () => {
-    const state = createSessionState("s1", "/path");
+    const state = new SessionState("s1", "/path");
     expect(generateSessionTitle(state, "My Session")).toBe("My Session");
   });
   
   it("adds fork prefix when parent exists", () => {
-    const state = createSessionState("s1", "/path", undefined, "parent-123-456-789");
+    const state = new SessionState("s1", "/path", undefined, "parent-123-456-789");
     expect(generateSessionTitle(state, "My Session")).toBe("[Fork::parent-1] My Session");
   });
   
   it("adds 'Untitled' with fork prefix when no name but has parent", () => {
-    const state = createSessionState("s1", "/path", undefined, "abcd1234-5678");
+    const state = new SessionState("s1", "/path", undefined, "abcd1234-5678");
     expect(generateSessionTitle(state)).toBe("[Fork::abcd1234] Untitled");
   });
 });
 
 describe("transformSession", () => {
   it("transforms session state to payload", () => {
-    const state = createSessionState(
+    const state = new SessionState(
       "session-123",
       "/home/user/project",
       { id: "claude-sonnet-4-5", provider: "anthropic" }
@@ -52,7 +52,7 @@ describe("transformSession", () => {
   });
   
   it("includes duration on final sync", () => {
-    const state = createSessionState("s1", "/path");
+    const state = new SessionState("s1", "/path");
     // Manually set startedAt to control duration
     (state as any).startedAt = Date.now() - 5000;
     
@@ -63,7 +63,7 @@ describe("transformSession", () => {
   });
   
   it("omits zero values", () => {
-    const state = createSessionState("s1", "/path");
+    const state = new SessionState("s1", "/path");
     const payload = transformSession(state);
     
     expect(payload.promptTokens).toBeUndefined();
@@ -73,7 +73,7 @@ describe("transformSession", () => {
   });
   
   it("includes non-zero usage stats", () => {
-    const state = createSessionState("s1", "/path");
+    const state = new SessionState("s1", "/path");
     state.promptTokens = 100;
     state.completionTokens = 50;
     state.cost = 0.005;

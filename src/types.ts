@@ -42,36 +42,6 @@ export interface MessagePayload {
 }
 
 /**
- * Internal session state tracked by the extension
- */
-export interface SessionState {
-  /** OpenSync external ID (pi session UUID) */
-  externalId: string;
-  /** Parent session ID if this is a fork */
-  parentExternalId?: string;
-  /** Project working directory */
-  projectPath: string;
-  /** Project name (basename of projectPath) */
-  projectName: string;
-  /** Session start timestamp */
-  startedAt: number;
-  /** Current model ID */
-  model?: string;
-  /** Current model provider */
-  provider?: string;
-  /** Accumulated input tokens */
-  promptTokens: number;
-  /** Accumulated output tokens */
-  completionTokens: number;
-  /** Accumulated total cost */
-  cost: number;
-  /** Message counter for ID generation */
-  messageCount: number;
-  /** Tool call counter */
-  toolCallCount: number;
-}
-
-/**
  * Result from OpenSync API calls
  */
 export interface SyncResult {

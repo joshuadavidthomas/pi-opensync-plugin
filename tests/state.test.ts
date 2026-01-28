@@ -1,16 +1,9 @@
 import { describe, it, expect } from "bun:test";
-import {
-  createSessionState,
-  updateSessionUsage,
-  incrementMessageCount,
-  incrementToolCallCount,
-  generateMessageId,
-  updateModel,
-} from "../src/state";
+import { SessionState } from "../src/state";
 
-describe("createSessionState", () => {
+describe("SessionState", () => {
   it("creates initial state with correct values", () => {
-    const state = createSessionState(
+    const state = new SessionState(
       "session-123",
       "/home/user/my-project",
       { id: "claude-sonnet-4-5", provider: "anthropic" }
@@ -30,7 +23,7 @@ describe("createSessionState", () => {
   });
   
   it("includes parentExternalId when provided", () => {
-    const state = createSessionState(
+    const state = new SessionState(
       "fork-456",
       "/home/user/project",
       undefined,
@@ -42,18 +35,16 @@ describe("createSessionState", () => {
   });
   
   it("works without model info", () => {
-    const state = createSessionState("s1", "/path");
+    const state = new SessionState("s1", "/path");
     
     expect(state.model).toBeUndefined();
     expect(state.provider).toBeUndefined();
   });
-});
 
-describe("updateSessionUsage", () => {
-  it("accumulates token usage and cost", () => {
-    let state = createSessionState("s1", "/path");
+  it("updateUsage accumulates token usage and cost", () => {
+    const state = new SessionState("s1", "/path");
     
-    state = updateSessionUsage(state, {
+    state.updateUsage({
       input: 100,
       output: 50,
       cost: { total: 0.001 },
@@ -63,7 +54,7 @@ describe("updateSessionUsage", () => {
     expect(state.completionTokens).toBe(50);
     expect(state.cost).toBe(0.001);
     
-    state = updateSessionUsage(state, {
+    state.updateUsage({
       input: 200,
       output: 100,
       cost: { total: 0.002 },
@@ -73,48 +64,43 @@ describe("updateSessionUsage", () => {
     expect(state.completionTokens).toBe(150);
     expect(state.cost).toBeCloseTo(0.003, 10);
   });
-});
 
-describe("incrementMessageCount", () => {
-  it("increments message count by 1", () => {
-    let state = createSessionState("s1", "/path");
+  it("incrementMessageCount increments message count by 1", () => {
+    const state = new SessionState("s1", "/path");
     expect(state.messageCount).toBe(0);
     
-    state = incrementMessageCount(state);
+    state.incrementMessageCount();
     expect(state.messageCount).toBe(1);
     
-    state = incrementMessageCount(state);
+    state.incrementMessageCount();
     expect(state.messageCount).toBe(2);
   });
-});
 
-describe("incrementToolCallCount", () => {
-  it("increments tool call count by specified amount", () => {
-    let state = createSessionState("s1", "/path");
+  it("incrementToolCallCount increments tool call count by specified amount", () => {
+    const state = new SessionState("s1", "/path");
     expect(state.toolCallCount).toBe(0);
     
-    state = incrementToolCallCount(state, 3);
+    state.incrementToolCallCount(3);
     expect(state.toolCallCount).toBe(3);
     
-    state = incrementToolCallCount(state);
+    state.incrementToolCallCount();
     expect(state.toolCallCount).toBe(4);
   });
-});
 
-describe("updateModel", () => {
-  it("updates model and provider", () => {
-    let state = createSessionState("s1", "/path");
+  it("updateModel updates model and provider", () => {
+    const state = new SessionState("s1", "/path");
     
-    state = updateModel(state, { id: "gpt-4", provider: "openai" });
+    state.updateModel({ id: "gpt-4", provider: "openai" });
     
     expect(state.model).toBe("gpt-4");
     expect(state.provider).toBe("openai");
   });
-});
 
-describe("generateMessageId", () => {
-  it("generates ID with session, role, and count", () => {
-    const id = generateMessageId("session-abc", 5, "user");
+  it("generateMessageId generates ID with session, role, and count", () => {
+    const state = new SessionState("session-abc", "/path");
+    state.messageCount = 5;
+    
+    const id = state.generateMessageId("user");
     expect(id).toBe("session-abc-user-5");
   });
 });

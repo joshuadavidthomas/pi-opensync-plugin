@@ -1,83 +1,89 @@
 import { basename } from "node:path";
-import type { SessionState } from "./types";
 
 /**
- * Create initial session state from pi context
+ * Internal session state tracked by the extension
  */
-export function createSessionState(
-  sessionId: string,
-  cwd: string,
-  model?: { id: string; provider: string },
-  parentExternalId?: string
-): SessionState {
-  return {
-    externalId: sessionId,
-    parentExternalId,
-    projectPath: cwd,
-    projectName: basename(cwd),
-    startedAt: Date.now(),
-    model: model?.id,
-    provider: model?.provider,
-    promptTokens: 0,
-    completionTokens: 0,
-    cost: 0,
-    messageCount: 0,
-    toolCallCount: 0,
-  };
-}
+export class SessionState {
+  /** OpenSync external ID (pi session UUID) */
+  externalId: string;
+  /** Parent session ID if this is a fork */
+  parentExternalId?: string;
+  /** Project working directory */
+  projectPath: string;
+  /** Project name (basename of projectPath) */
+  projectName: string;
+  /** Session start timestamp */
+  startedAt: number;
+  /** Current model ID */
+  model?: string;
+  /** Current model provider */
+  provider?: string;
+  /** Accumulated input tokens */
+  promptTokens: number;
+  /** Accumulated output tokens */
+  completionTokens: number;
+  /** Accumulated total cost */
+  cost: number;
+  /** Message counter for ID generation */
+  messageCount: number;
+  /** Tool call counter */
+  toolCallCount: number;
 
-/**
- * Update session state with usage from an assistant message
- */
-export function updateSessionUsage(
-  state: SessionState,
-  usage: { input: number; output: number; cost: { total: number } }
-): SessionState {
-  return {
-    ...state,
-    promptTokens: state.promptTokens + usage.input,
-    completionTokens: state.completionTokens + usage.output,
-    cost: state.cost + usage.cost.total,
-  };
-}
+  constructor(
+    sessionId: string,
+    cwd: string,
+    model?: { id: string; provider: string },
+    parentExternalId?: string
+  ) {
+    this.externalId = sessionId;
+    this.parentExternalId = parentExternalId;
+    this.projectPath = cwd;
+    this.projectName = basename(cwd);
+    this.startedAt = Date.now();
+    this.model = model?.id;
+    this.provider = model?.provider;
+    this.promptTokens = 0;
+    this.completionTokens = 0;
+    this.cost = 0;
+    this.messageCount = 0;
+    this.toolCallCount = 0;
+  }
 
-/**
- * Increment message count
- */
-export function incrementMessageCount(state: SessionState): SessionState {
-  return {
-    ...state,
-    messageCount: state.messageCount + 1,
-  };
-}
+  /**
+   * Update session state with usage from an assistant message
+   */
+  updateUsage(usage: { input: number; output: number; cost: { total: number } }): void {
+    this.promptTokens += usage.input;
+    this.completionTokens += usage.output;
+    this.cost += usage.cost.total;
+  }
 
-/**
- * Increment tool call count
- */
-export function incrementToolCallCount(state: SessionState, count: number = 1): SessionState {
-  return {
-    ...state,
-    toolCallCount: state.toolCallCount + count,
-  };
-}
+  /**
+   * Increment message count
+   */
+  incrementMessageCount(): void {
+    this.messageCount++;
+  }
 
-/**
- * Update model info
- */
-export function updateModel(
-  state: SessionState,
-  model: { id: string; provider: string }
-): SessionState {
-  return {
-    ...state,
-    model: model.id,
-    provider: model.provider,
-  };
-}
+  /**
+   * Increment tool call count
+   */
+  incrementToolCallCount(count: number = 1): void {
+    this.toolCallCount += count;
+  }
 
-/**
- * Generate a message ID for OpenSync
- */
-export function generateMessageId(sessionId: string, messageCount: number, role: string): string {
-  return `${sessionId}-${role}-${messageCount}`;
+  /**
+   * Update model info
+   */
+  updateModel(model: { id: string; provider: string }): void {
+    this.model = model.id;
+    this.provider = model.provider;
+  }
+
+  /**
+   * Generate a message ID for OpenSync
+   */
+  generateMessageId(role: string): string {
+    return `${this.externalId}-${role}-${this.messageCount}`;
+  }
 }
