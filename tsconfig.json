@@ -8,7 +8,9 @@
     "skipLibCheck": true,
     "declaration": true,
     "outDir": "dist",
-    "types": ["bun-types"]
+    "types": ["bun-types"],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": ["src/**/*", "tests/**/*"]
 }
