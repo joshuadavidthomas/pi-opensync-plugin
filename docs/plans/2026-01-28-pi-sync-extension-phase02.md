@@ -256,3 +256,13 @@ After all verifications pass, commit with message:
 ```
 Add configuration management with env var support
 ```
+
+## Implementation Notes
+
+### Deviations from Original Plan
+
+**No significant deviations** - Configuration management was implemented as planned. The only minor changes were:
+
+1. **syncToolCalls default:** Changed from `false` to `true` (opt-out instead of opt-in) - see Phase 1 implementation notes for reasoning
+
+All other config loading, env var support, and file management functions work exactly as specified in the plan.

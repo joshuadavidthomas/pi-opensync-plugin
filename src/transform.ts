@@ -162,45 +162,6 @@ export function countToolCalls(content: AssistantContentPart[]): number {
 }
 
 /**
- * Extract tool calls as structured parts for OpenSync
- */
-export function extractToolCallParts(content: AssistantContentPart[]): MessagePart[] {
-  const parts: MessagePart[] = [];
-  
-  for (const part of content) {
-    if (part.type === "toolCall") {
-      parts.push({
-        type: "tool-call",
-        content: {
-          toolName: part.name,
-          args: part.arguments,
-        },
-      });
-    }
-  }
-  
-  return parts;
-}
-
-/**
- * Extract thinking/reasoning as structured parts for OpenSync
- */
-export function extractThinkingParts(content: AssistantContentPart[]): MessagePart[] {
-  const parts: MessagePart[] = [];
-  
-  for (const part of content) {
-    if (part.type === "thinking") {
-      parts.push({
-        type: "thinking",
-        content: part.thinking,
-      });
-    }
-  }
-  
-  return parts;
-}
-
-/**
  * Extract tool results as structured parts for OpenSync
  */
 export function extractToolResultParts(toolResult: ToolResultMessageLike): MessagePart[] {
@@ -264,22 +225,55 @@ export function transformAssistantMessage(
   // Add structured parts for tool calls, tool results, and thinking
   const parts: MessagePart[] = [];
   
+  // Check what types of content we have
+  const hasToolCalls = message.content.some(part => part.type === "toolCall");
+  const hasThinking = includeThinking && message.content.some(part => part.type === "thinking");
+  const hasToolResults = toolResults.length > 0;
+  
   // If there's text content AND we have tool calls/thinking/results, add text as a part first
   // This works around OpenSync UI limitation where it only renders parts OR textContent, not both
-  const toolCallParts = extractToolCallParts(message.content);
-  const thinkingParts = includeThinking ? extractThinkingParts(message.content) : [];
-  const toolResultParts = toolResults.flatMap(result => extractToolResultParts(result));
-  
-  if (textContent && (toolCallParts.length > 0 || thinkingParts.length > 0 || toolResultParts.length > 0)) {
+  if (textContent && (hasToolCalls || hasThinking || hasToolResults)) {
     parts.push({
       type: "text",
       content: textContent,
     });
   }
   
-  parts.push(...toolCallParts);
-  parts.push(...thinkingParts);
-  parts.push(...toolResultParts);
+  // First pass: interleave tool calls with their results in the order they appear
+  // Tool calls and results are in the same order (tool call 1 -> result 1, tool call 2 -> result 2, etc.)
+  let resultIndex = 0;
+  for (const part of message.content) {
+    if (part.type === "toolCall") {
+      // Add the tool call
+      parts.push({
+        type: "tool-call",
+        content: {
+          toolName: part.name,
+          args: part.arguments,
+        },
+      });
+      
+      // Add the corresponding tool result if it exists
+      if (resultIndex < toolResults.length) {
+        const result = toolResults[resultIndex];
+        const resultParts = extractToolResultParts(result);
+        parts.push(...resultParts);
+        resultIndex++;
+      }
+    }
+  }
+  
+  // Second pass: add thinking blocks (after tool calls/results)
+  if (includeThinking) {
+    for (const part of message.content) {
+      if (part.type === "thinking") {
+        parts.push({
+          type: "thinking",
+          content: part.thinking,
+        });
+      }
+    }
+  }
   
   if (parts.length > 0) {
     payload.parts = parts;

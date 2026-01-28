@@ -193,3 +193,23 @@ After all verifications pass, commit with message:
 ```
 Add pi-opensync-plugin skeleton with types
 ```
+
+## Implementation Notes
+
+### Deviations from Original Plan
+
+**1. MessagePayload structure changed:**
+- **Planned:** Simple `textContent` only field
+- **Actual:** Added `parts?: MessagePart[]` field to support structured content (tool calls, tool results, thinking blocks)
+- **Reason:** OpenSync API supports structured parts for richer message display, which we need for tool calls and results
+
+**2. MessagePart interface added:**
+- **Not in original plan:** New `MessagePart` interface with `type` and `content` fields
+- **Reason:** Required to represent structured parts like tool calls, tool results, and thinking blocks
+
+**3. Config syncToolCalls default changed:**
+- **Planned:** `default: false`
+- **Actual:** `default: true` (opt-out instead of opt-in)
+- **Reason:** Tool results are now parts of assistant messages (not separate messages), so syncing them by default provides better UX
+
+These changes were necessary to properly handle the OpenSync API's structured parts feature and to work around UI limitations (see `docs/opensync-ui-workarounds.md`).

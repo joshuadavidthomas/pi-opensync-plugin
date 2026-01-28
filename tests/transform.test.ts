@@ -5,8 +5,6 @@ import {
   extractUserMessageText,
   extractAssistantMessageText,
   countToolCalls,
-  extractToolCallParts,
-  extractThinkingParts,
   transformUserMessage,
   transformAssistantMessage,
 } from "../src/transform.js";
@@ -166,66 +164,6 @@ describe("countToolCalls", () => {
   it("returns 0 when no tool calls", () => {
     const content = [{ type: "text" as const, text: "Hello" }];
     expect(countToolCalls(content)).toBe(0);
-  });
-});
-
-describe("extractToolCallParts", () => {
-  it("extracts tool calls as structured parts", () => {
-    const content = [
-      { type: "text" as const, text: "I'll read the file" },
-      { type: "toolCall" as const, id: "tc1", name: "read", arguments: { path: "foo.txt" } },
-      { type: "toolCall" as const, id: "tc2", name: "write", arguments: { path: "bar.txt", content: "data" } },
-    ];
-    
-    const parts = extractToolCallParts(content);
-    
-    expect(parts).toHaveLength(2);
-    expect(parts[0]).toEqual({
-      type: "tool-call",
-      content: {
-        toolName: "read",
-        args: { path: "foo.txt" },
-      },
-    });
-    expect(parts[1]).toEqual({
-      type: "tool-call",
-      content: {
-        toolName: "write",
-        args: { path: "bar.txt", content: "data" },
-      },
-    });
-  });
-  
-  it("returns empty array when no tool calls", () => {
-    const content = [{ type: "text" as const, text: "Hello" }];
-    expect(extractToolCallParts(content)).toEqual([]);
-  });
-});
-
-describe("extractThinkingParts", () => {
-  it("extracts thinking as structured parts", () => {
-    const content = [
-      { type: "thinking" as const, thinking: "Let me analyze this..." },
-      { type: "text" as const, text: "The answer is 42" },
-      { type: "thinking" as const, thinking: "This makes sense because..." },
-    ];
-    
-    const parts = extractThinkingParts(content);
-    
-    expect(parts).toHaveLength(2);
-    expect(parts[0]).toEqual({
-      type: "thinking",
-      content: "Let me analyze this...",
-    });
-    expect(parts[1]).toEqual({
-      type: "thinking",
-      content: "This makes sense because...",
-    });
-  });
-  
-  it("returns empty array when no thinking", () => {
-    const content = [{ type: "text" as const, text: "Hello" }];
-    expect(extractThinkingParts(content)).toEqual([]);
   });
 });
 
@@ -405,6 +343,56 @@ describe("transformAssistantMessage", () => {
     expect(payload.parts![1].type).toBe("tool-call");
     expect(payload.parts![2].type).toBe("tool-result");
     expect(payload.parts![2].content).toBe("file contents here");
+  });
+  
+  it("interleaves multiple tool calls with their results", () => {
+    const message = {
+      role: "assistant" as const,
+      content: [
+        { type: "text" as const, text: "I'll read both files" },
+        { type: "toolCall" as const, id: "tc1", name: "read", arguments: { path: "file1.txt" } },
+        { type: "toolCall" as const, id: "tc2", name: "read", arguments: { path: "file2.txt" } },
+        { type: "toolCall" as const, id: "tc3", name: "bash", arguments: { command: "ls" } },
+      ],
+      model: "claude-sonnet-4-5",
+      timestamp: 1706400000000,
+    };
+    
+    const toolResults = [
+      {
+        role: "toolResult" as const,
+        toolName: "read",
+        content: [{ type: "text" as const, text: "contents of file1" }],
+      },
+      {
+        role: "toolResult" as const,
+        toolName: "read",
+        content: [{ type: "text" as const, text: "contents of file2" }],
+      },
+      {
+        role: "toolResult" as const,
+        toolName: "bash",
+        content: [{ type: "text" as const, text: "file1.txt\nfile2.txt" }],
+      },
+    ];
+    
+    const payload = transformAssistantMessage("session-123", "msg-2", message, false, toolResults);
+    
+    // Text + (tool call + result) * 3 = 7 parts
+    expect(payload.parts).toHaveLength(7);
+    expect(payload.parts![0].type).toBe("text");
+    expect(payload.parts![1].type).toBe("tool-call");
+    expect((payload.parts![1].content as any).toolName).toBe("read");
+    expect(payload.parts![2].type).toBe("tool-result");
+    expect(payload.parts![2].content).toBe("contents of file1");
+    expect(payload.parts![3].type).toBe("tool-call");
+    expect((payload.parts![3].content as any).toolName).toBe("read");
+    expect(payload.parts![4].type).toBe("tool-result");
+    expect(payload.parts![4].content).toBe("contents of file2");
+    expect(payload.parts![5].type).toBe("tool-call");
+    expect((payload.parts![5].content as any).toolName).toBe("bash");
+    expect(payload.parts![6].type).toBe("tool-result");
+    expect(payload.parts![6].content).toBe("file1.txt\nfile2.txt");
   });
 });
 

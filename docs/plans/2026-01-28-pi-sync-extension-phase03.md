@@ -343,3 +343,17 @@ After all verifications pass, commit with message:
 ```
 Add OpenSync API client with connection testing
 ```
+
+## Implementation Notes
+
+### Deviations from Original Plan
+
+**No significant deviations** - OpenSync API client was implemented as planned with:
+
+- ✅ POST to `/sync/session`, `/sync/message`, `/sync/batch` endpoints
+- ✅ Bearer token authentication
+- ✅ Health check on `/health`
+- ✅ Debug logging support
+- ✅ Error handling with SyncResult type
+
+The client successfully communicates with the OpenSync Convex backend using the same patterns as the Claude Code plugin.

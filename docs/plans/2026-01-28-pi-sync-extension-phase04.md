@@ -720,3 +720,47 @@ After all verifications pass, commit with message:
 ```
 Add state management and data transformation
 ```
+
+## Implementation Notes
+
+### Deviations from Original Plan
+
+**1. transform.ts has additional functions not in the original plan:**
+- **Added:** `extractToolCallParts()` - Extracts tool calls as structured parts
+- **Added:** `extractThinkingParts()` - Extracts thinking blocks as structured parts
+- **Added:** `extractToolResultParts()` - Extracts tool results as structured parts
+- **Reason:** These functions are needed to build the `parts` array in MessagePayload (Phase 1 type change)
+
+**2. transformToolResultMessage() function removed:**
+- **Planned:** Separate function to create tool result messages with `role: "tool"`
+- **Actual:** Tool results are now included as parts of assistant messages instead
+- **Reason:** OpenSync UI groups messages into separate bubbles. Including tool results as parts of the assistant message keeps the entire "turn" (assistant response + tool calls + tool results) visually grouped together in one bubble
+
+**3. transformAssistantMessage() signature changed:**
+- **Planned:** `transformAssistantMessage(sessionId, messageId, message, includeThinking)`
+- **Actual:** `transformAssistantMessage(sessionId, messageId, message, includeThinking, toolResults)`
+- **Reason:** Added `toolResults` parameter to include tool results as parts of the assistant message
+
+**4. generateSessionTitle() behavior changed:**
+- **Planned:** Returns `undefined` when no session name provided
+- **Actual:** Returns `"Untitled"` as fallback (or fork prefix + "Untitled")
+- **Reason:** Matches pi's UI behavior and ensures fork sessions always have a meaningful title
+
+**5. Text content workaround added:**
+- **Not in original plan:** When a message has both text content AND tool calls/thinking, the text is also added as a `{type: "text", content: "..."}` part at the beginning of the parts array
+- **Reason:** OpenSync UI renders either `textContent` OR `parts`, not both. This workaround ensures text is visible when parts exist
+- **See:** `docs/opensync-ui-workarounds.md` for detailed technical explanation
+
+**6. ThinkingContent interface property name:**
+- **Planned:** `type: "thinking"; text: string`
+- **Actual:** `type: "thinking"; thinking: string`
+- **Reason:** Matches actual pi-ai types (property is named `thinking`, not `text`)
+
+**7. Tool calls and results interleaving (added post-Phase 5):**
+- **Initial implementation:** Tool calls were extracted into an array, then tool results were extracted, then both arrays were concatenated (all calls first, then all results)
+- **Problem discovered:** In OpenSync UI, users had to scroll down past all tool calls to find the result of the first call
+- **Fix applied:** Modified `transformAssistantMessage()` to iterate through content once and interleave each tool call with its corresponding result in sequence
+- **Result:** Parts array now has structure: `text → call1 → result1 → call2 → result2 → call3 → result3 → thinking`
+- **See:** `docs/tool-call-result-interleaving-fix.md` for detailed technical explanation
+
+These changes were necessary to properly support OpenSync's structured parts feature and work around UI limitations while maintaining a clean user experience.
