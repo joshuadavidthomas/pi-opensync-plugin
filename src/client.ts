@@ -20,7 +20,9 @@ export class SyncClient {
   private async request<T>(endpoint: string, data: unknown): Promise<SyncResult & { data?: T }> {
     const url = `${this.siteUrl}${endpoint}`;
     
-    this.log(`POST ${endpoint}`, data);
+    if (this.debug) {
+      this.log(`→ ${endpoint}`);
+    }
     
     try {
       const response = await fetch(url, {
@@ -34,16 +36,18 @@ export class SyncClient {
       
       if (!response.ok) {
         const text = await response.text();
-        this.log(`Error ${response.status}:`, text);
+        this.log(`✗ ${endpoint} ${response.status}:`, text);
         return { success: false, error: `${response.status}: ${text}` };
       }
       
       const result = await response.json() as T;
-      this.log("Response:", result);
+      if (this.debug) {
+        this.log(`✓ ${endpoint}`);
+      }
       return { success: true, data: result };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.log("Request failed:", message);
+      this.log(`✗ ${endpoint}:`, message);
       return { success: false, error: message };
     }
   }
