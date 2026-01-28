@@ -1,7 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { AssistantMessage, UserMessage, ToolResultMessage } from "@mariozechner/pi-ai";
-import { loadConfig } from "./config/index";
-import { ConfigSelectorComponent } from "./config/selector";
+import { loadConfig, ConfigSelectorComponent } from "./config";
 import { SyncClient } from "./client";
 import { debugLog } from "./debug";
 import {
