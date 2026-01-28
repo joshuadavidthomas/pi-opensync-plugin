@@ -106,12 +106,11 @@ ln -s ../../src .pi/extensions/pi-opensync-plugin
 
 #### Approach Taken
 
-<!-- Fill in during Phase 1 implementation -->
-**Status**: Not yet determined
+**Status**: ✅ Fallback approach (symlink) confirmed working
 
-**Approach used**: _TBD_
+**Approach used**: Symlink approach - `.pi/extensions/pi-opensync-plugin` → `../../src`
 
-**Context/Reasoning**: _TBD_
+**Context/Reasoning**: The primary approach (`.pi/settings.json` with `"extensions": ["./src"]`) did not work - the `/opensync-config` command was not available after `/reload`. Switched to the symlink fallback approach which uses pi's native auto-discovery from `.pi/extensions/*/index.ts`.
 
 ### Production Installation
 
@@ -123,7 +122,7 @@ For production use, users will clone/copy to `~/.pi/agent/extensions/pi-opensync
 
 | Phase | Description | File | Status |
 |-------|-------------|------|--------|
-| 1 | Project Setup & Core Types | [phase01.md](./2026-01-28-pi-sync-extension-phase01.md) | Planned |
+| 1 | Project Setup & Core Types | [phase01.md](./2026-01-28-pi-sync-extension-phase01.md) | ✅ Complete |
 | 2 | Configuration Management | [phase02.md](./2026-01-28-pi-sync-extension-phase02.md) | Planned |
 | 3 | OpenSync API Client | [phase03.md](./2026-01-28-pi-sync-extension-phase03.md) | Planned |
 | 4 | State Management & Data Transformation | [phase04.md](./2026-01-28-pi-sync-extension-phase04.md) | Planned |

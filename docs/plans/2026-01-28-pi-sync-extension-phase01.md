@@ -52,22 +52,17 @@ Initialize the bun project, define TypeScript interfaces, and establish a minima
 }
 ```
 
-### 2. Pi Settings for Development (Primary Approach)
-**File**: `.pi/settings.json`
+### 2. Pi Settings for Development (Fallback Approach - Used)
+**ACTUALLY IMPLEMENTED**: Symlink approach
 
-```json
-{
-  "extensions": ["./src"]
-}
+The `.pi/settings.json` approach did not work (command not found after reload), so we used the symlink fallback:
+
+```bash
+mkdir -p .pi/extensions
+ln -s ../../src .pi/extensions/pi-opensync-plugin
 ```
 
-This configures pi to load the extension from `./src`, enabling hot-reload via `/reload`.
-
-> **Note**: This approach is untested. If `/reload` doesn't pick up the extension, fall back to the symlink approach described in the main plan's "Development Workflow" section. If using the symlink fallback, skip creating this file and instead run:
-> ```bash
-> mkdir -p .pi/extensions
-> ln -s ../../src .pi/extensions/pi-opensync-plugin
-> ```
+This uses pi's native auto-discovery from `.pi/extensions/*/index.ts`.
 
 ### 3. Define Types
 **File**: `src/types.ts`
@@ -186,12 +181,12 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
 ## Success Criteria:
 
 ### Automated Verification:
-- [ ] `bun install` completes successfully
-- [ ] `bun run typecheck` passes with no errors
+- [x] `bun install` completes successfully
+- [x] `bun run typecheck` passes with no errors
 
 ### Manual Verification:
-- [ ] `/reload` loads the extension without errors
-- [ ] `/opensync-config` shows "pi-opensync-plugin loaded!" notification
+- [x] `/reload` loads the extension without errors
+- [x] `/opensync-config` shows "pi-opensync-plugin loaded!" notification
 
 ### Commit Checkpoint:
 After all verifications pass, commit with message:
