@@ -360,11 +360,10 @@ export class ConfigSelectorComponent {
       return;
     }
     
-    // Test connection
-    const testClient = new SyncClient({
-      ...this.config.toJSON(),
-      convexUrl: this.config.convexUrl.replace(".convex.cloud", ".convex.site"),
-    });
+    // Test connection (create a temp config with normalized URL)
+    const testConfig = new Config(this.config.toJSON());
+    testConfig.convexUrl = testConfig.convexUrl.replace(".convex.cloud", ".convex.site");
+    const testClient = new SyncClient(testConfig);
     const testResult = await testClient.testConnection();
     
     if (!testResult.success) {
