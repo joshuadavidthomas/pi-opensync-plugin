@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { SyncClient } from "../src/client";
 import { Config } from "../src/config";
-import type { SessionPayload, MessagePayload } from "../src/types";
+import type { SessionPayload, MessagePayload } from "../src/client";
 
 describe("SyncClient", () => {
   const mockConfig = new Config({

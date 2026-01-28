@@ -1,4 +1,4 @@
-import type { SessionPayload, MessagePayload, MessagePart } from "./types";
+import type { SessionPayload, MessagePayload, MessagePart } from "./client";
 import type { SessionState } from "./state";
 
 // Minimal type definitions for message content

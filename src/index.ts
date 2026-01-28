@@ -11,7 +11,7 @@ import {
   extractUserMessageText,
   countToolCalls,
 } from "./transform";
-import type { MessagePayload } from "./types";
+import type { MessagePayload } from "./client";
 
 export default function piOpensyncPlugin(pi: ExtensionAPI) {
   const config = loadConfig();
