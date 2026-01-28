@@ -105,6 +105,13 @@ export class Config {
     }
     writeFileSync(CONFIG_FILE, JSON.stringify(this.toJSON(), null, 2));
   }
+
+  /**
+   * Get config file path (for display purposes)
+   */
+  static getPath(): string {
+    return CONFIG_FILE;
+  }
 }
 
 /**
@@ -155,13 +162,6 @@ export function loadConfigFile(): Config | null {
     console.error("[pi-opensync] Error loading config:", error);
   }
   return null;
-}
-
-/**
- * Get config file path (for display purposes)
- */
-export function getConfigPath(): string {
-  return CONFIG_FILE;
 }
 
 /**
@@ -389,7 +389,7 @@ export class ConfigSelectorComponent {
     try {
       this.config.save();
       this.ctx.ui.notify(
-        `Config saved to ${CONFIG_FILE}\n\nRestart pi or use /reload to apply changes.`,
+        `Config saved to ${Config.getPath()}\n\nRestart pi or use /reload to apply changes.`,
         "info"
       );
     } catch (error) {
