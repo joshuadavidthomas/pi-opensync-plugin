@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Config } from "../types.js";
@@ -65,28 +65,8 @@ export function saveConfig(config: Config): void {
 }
 
 /**
- * Delete configuration file
- */
-export function clearConfig(): void {
-  try {
-    if (existsSync(CONFIG_FILE)) {
-      unlinkSync(CONFIG_FILE);
-    }
-  } catch (error) {
-    console.error("[pi-opensync] Error clearing config:", error);
-  }
-}
-
-/**
  * Get config file path (for display purposes)
  */
 export function getConfigPath(): string {
   return CONFIG_FILE;
-}
-
-/**
- * Check if config file exists
- */
-export function configExists(): boolean {
-  return existsSync(CONFIG_FILE);
 }
