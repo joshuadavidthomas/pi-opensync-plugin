@@ -204,6 +204,49 @@ Created comprehensive documentation for deviations:
 2. `opensync-ui-workarounds.md` for technical details
 3. This summary document for high-level overview
 
+## Phase 6: Interactive Configuration Command
+
+### Component Architecture Change
+- **Planned:** Sequential prompts using `ctx.ui.select()` → `ctx.ui.input()` flow
+- **Actual:** Single unified settings screen using `SettingsList` component
+- **Reason:** `ctx.ui.input()` doesn't support pre-filled default values (only placeholder text)
+- **Solution:** Used pi's native `SettingsList` with text input submenus for editable fields
+- **Files:** `src/config/selector.ts` (new), `src/index.ts`
+
+### Module Reorganization
+**Not in plan:** Created `src/config/` module structure
+- Moved `src/config.ts` → `src/config/index.ts`
+- Created `src/config/selector.ts` for UI component
+- Abstracted config UI into `ConfigSelectorComponent` class
+- **Reason:** Better code organization, follows pi's component patterns
+- **Reference:** `ref/pi-mono/packages/coding-agent/src/modes/interactive/components/settings-selector.ts`
+
+### Removed Features from Plan
+Several menu options from the original plan were removed:
+- ❌ "View current config" - Not needed, all visible in settings list
+- ❌ "Test connection" - Runs automatically before save
+- ❌ "Clear config" - Can add later if needed
+- ❌ "Show config file path" - Can add later if needed
+
+### Configuration Flow Change
+- **Planned:** Sequential: URL prompt → API key prompt → options prompt → save
+- **Actual:** Single screen with all options visible, edit any field, save on exit
+- **Benefit:** Users see all config at once, consistent with pi's `/settings` command
+
+### Default Value Bug Fix
+**Discovered during implementation:** `syncToolCalls` default value inconsistency
+- Runtime code defaulted to `true` when undefined
+- Initial UI implementation showed `false` when undefined
+- **Fix:** Changed UI default from `?? false` to `!== false` to match runtime behavior
+- **Files:** `src/config/selector.ts`
+
+### Import Organization
+**Not in plan but enforced:** Moved all dynamic imports to top-level
+- Removed all `require()` calls from helper functions
+- Removed all `await import()` from handlers and tests
+- Applied to both `src/` and `tests/` directories
+- **Reason:** Code quality, static analysis benefits, follows ES module best practices
+
 ## Upstream Contributions Identified
 
 Issues that should be contributed back to OpenSync:

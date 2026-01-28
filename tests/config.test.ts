@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { normalizeConvexUrl } from "../src/config.js";
+import { normalizeConvexUrl, loadConfig } from "../src/config/index.js";
 
 describe("normalizeConvexUrl", () => {
   it("converts .convex.cloud to .convex.site", () => {
@@ -42,13 +42,11 @@ describe("loadConfig with environment variables", () => {
     Object.assign(process.env, originalEnv);
   });
   
-  it("loads from environment variables when present", async () => {
+  it("loads from environment variables when present", () => {
     process.env.PI_OPENSYNC_CONVEX_URL = "https://test.convex.cloud";
     process.env.PI_OPENSYNC_API_KEY = "osk_test123";
     process.env.PI_OPENSYNC_DEBUG = "true";
     
-    // Re-import to get fresh module
-    const { loadConfig } = await import("../src/config.js");
     const config = loadConfig();
     
     expect(config).not.toBeNull();
@@ -59,12 +57,11 @@ describe("loadConfig with environment variables", () => {
     expect(config!.syncToolCalls).toBe(true);
   });
   
-  it("returns null when no env vars and no config file", async () => {
+  it("returns null when no env vars and no config file", () => {
     // Ensure no env vars set
     delete process.env.PI_OPENSYNC_CONVEX_URL;
     delete process.env.PI_OPENSYNC_API_KEY;
     
-    const { loadConfig } = await import("../src/config.js");
     // This will return null if no config file exists
     // (which is the case in a clean test environment)
     const config = loadConfig();

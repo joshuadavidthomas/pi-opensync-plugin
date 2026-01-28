@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { AssistantMessage, UserMessage, ToolResultMessage } from "@mariozechner/pi-ai";
-import { loadConfig, getConfigPath } from "./config.js";
+import { loadConfig } from "./config/index.js";
+import { ConfigSelectorComponent } from "./config/selector.js";
 import { SyncClient } from "./client.js";
 import { debugLog } from "./debug.js";
 import {
@@ -280,57 +281,47 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
   });
 }
 
-function registerConfigCommand(pi: ExtensionAPI, config: Config | null, client: SyncClient | null) {
+function registerConfigCommand(pi: ExtensionAPI, currentConfig: Config | null, client: SyncClient | null) {
   pi.registerCommand("opensync-config", {
     description: "Configure OpenSync sync settings",
     handler: async (_args, ctx) => {
       if (!ctx.hasUI) {
+        ctx.ui.notify("Config command requires interactive mode", "error");
         return;
       }
       
-      if (config && client) {
-        const action = await ctx.ui.select("OpenSync Configuration", [
-          "View current config",
-          "Test connection",
-          "Show config file path",
-        ]);
-        
-        if (!action) return;
-        
-        switch (action) {
-          case "View current config": {
-            ctx.ui.notify(
-              `Convex URL: ${config.convexUrl}\n` +
-              `API Key: ${config.apiKey.slice(0, 8)}...\n` +
-              `Auto Sync: ${config.autoSync !== false}\n` +
-              `Sync Tool Calls: ${config.syncToolCalls !== false}\n` +
-              `Sync Thinking: ${config.syncThinking ?? false}\n` +
-              `Debug: ${config.debug ?? false}`,
-              "info"
-            );
-            break;
-          }
-          case "Test connection": {
-            ctx.ui.notify("Testing connection...", "info");
-            const result = await client.testConnection();
-            if (result.success) {
-              ctx.ui.notify("Connection successful!", "info");
-            } else {
-              ctx.ui.notify(`Connection failed: ${result.error}`, "error");
-            }
-            break;
-          }
-          case "Show config file path": {
-            ctx.ui.notify(`Config file: ${getConfigPath()}`, "info");
-            break;
-          }
-        }
-      } else {
-        ctx.ui.notify(
-          `No config found.\n\nCreate config at:\n${getConfigPath()}\n\nOr set environment variables:\nPI_OPENSYNC_CONVEX_URL\nPI_OPENSYNC_API_KEY`,
-          "info"
+      // If no config, show setup prompt
+      if (!currentConfig) {
+        const setup = await ctx.ui.confirm(
+          "No Configuration",
+          "OpenSync is not configured. Set up now?"
         );
+        if (!setup) return;
       }
+      
+      await ctx.ui.custom<void>((tui, _theme, _kb, done) => {
+        const component = new ConfigSelectorComponent(
+          currentConfig,
+          ctx,
+          {
+            onClose: () => done(),
+            requestRender: () => tui.requestRender(),
+          }
+        );
+        
+        return {
+          render(width: number) {
+            return component.render(width);
+          },
+          invalidate() {
+            component.invalidate();
+          },
+          handleInput(data: string) {
+            component.handleInput(data);
+            tui.requestRender();
+          },
+        };
+      });
     },
   });
 }

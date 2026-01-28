@@ -194,3 +194,87 @@ After all verifications pass, commit with message:
 ```
 Add interactive configuration command
 ```
+
+---
+
+## Implementation Notes
+
+### ✅ Implementation Complete
+
+**Major Deviation:** Changed from sequential prompts to unified settings screen using `SettingsList`.
+
+**Reason:** `ctx.ui.input()` doesn't support pre-filled default values (only placeholder text). This would have made editing existing config frustrating - users would have to retype everything.
+
+**Solution:** Used pi's native `SettingsList` component pattern (same as pi's `/settings` command):
+- Single screen showing all config options
+- Text input submenus for URL and API key (with pre-filled values)
+- Toggle fields for boolean options
+- Search/filter built-in
+- Save confirmation on Esc
+
+### Files Changed
+
+**New Files:**
+- `src/config/selector.ts` - `ConfigSelectorComponent` class
+
+**Modified Files:**
+- `src/config/index.ts` - Moved from `src/config.ts`, organized as module
+- `src/index.ts` - Simplified command handler to use component
+- `tests/config.test.ts` - Removed dynamic imports
+
+**File Structure:**
+```
+src/
+  ├── config/
+  │   ├── index.ts          # Config file management
+  │   └── selector.ts       # Config UI component
+  └── ...
+```
+
+### Features Implemented
+- ✅ Unified settings screen (better UX than sequential prompts)
+- ✅ Text input submenus with pre-filled values
+- ✅ Toggle fields for boolean options
+- ✅ Connection test before save
+- ✅ Warn on connection failure but allow saving
+- ✅ Prompt to `/reload` after save
+- ✅ Setup prompt when no config exists
+- ✅ Search/filter in settings list
+
+### Features Removed from Plan
+- ❌ "View current config" - Not needed (all visible in list)
+- ❌ "Test connection" - Runs automatically before save
+- ❌ "Clear config" - Can add later if needed
+- ❌ "Show config file path" - Can add later if needed
+
+### Bug Fixes During Implementation
+- Fixed `syncToolCalls` default value inconsistency (was showing `false`, now correctly shows `true` when undefined)
+
+### Code Quality Improvements
+- Moved all dynamic imports to top-level imports
+- Removed all `require()` and `await import()` calls
+- Applied to both `src/` and `tests/` directories
+
+### Automated Verification Results
+- ✅ `bun run typecheck` - No errors
+- ✅ `bun run test` - 47 tests pass, 0 failures
+- ✅ No dynamic imports anywhere
+
+### Manual Verification Required
+User needs to test:
+1. `/opensync-config` with no existing config
+2. `/opensync-config` with existing config
+3. Edit text fields (URL, API key) - verify pre-filled values work
+4. Toggle boolean fields
+5. Save with valid/invalid credentials
+6. Cancel without saving
+7. Search/filter functionality
+
+### Reference Implementation
+Followed patterns from:
+- `ref/pi-mono/packages/coding-agent/src/modes/interactive/components/settings-selector.ts`
+- `ref/pi-mono/packages/coding-agent/examples/extensions/tools.ts`
+
+### Documentation Created
+- `docs/phase06-completion-summary.md` - Detailed completion report
+- `docs/implementation-deviations-summary.md` - Updated with Phase 6 changes
