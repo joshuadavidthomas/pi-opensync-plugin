@@ -708,9 +708,9 @@ describe("transformToolResultMessage", () => {
 ## Success Criteria:
 
 ### Automated Verification:
-- [ ] `bun test tests/state.test.ts` passes
-- [ ] `bun test tests/transform.test.ts` passes
-- [ ] `bun run typecheck` passes
+- [x] `bun test tests/state.test.ts` passes
+- [x] `bun test tests/transform.test.ts` passes
+- [x] `bun run typecheck` passes
 
 ### Manual Verification:
 - [ ] N/A (no manual verification needed for this phase)
