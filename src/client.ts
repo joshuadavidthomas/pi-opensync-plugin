@@ -1,5 +1,5 @@
-import type { Config, SessionPayload, MessagePayload, SyncResult } from "./types.js";
-import { debugLog } from "./debug.js";
+import type { Config, SessionPayload, MessagePayload, SyncResult } from "./types";
+import { debugLog } from "./debug";
 
 export class SyncClient {
   private siteUrl: string;

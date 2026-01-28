@@ -1,5 +1,5 @@
 import { basename } from "node:path";
-import type { SessionState } from "./types.js";
+import type { SessionState } from "./types";
 
 /**
  * Create initial session state from pi context

@@ -13,9 +13,9 @@ import {
 } from "@mariozechner/pi-tui";
 import { getSettingsListTheme, DynamicBorder } from "@mariozechner/pi-coding-agent";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
-import type { Config } from "../types.js";
-import { saveConfig, getConfigPath } from "./index.js";
-import { SyncClient } from "../client.js";
+import type { Config } from "../types";
+import { saveConfig, getConfigPath } from "./index";
+import { SyncClient } from "../client";
 
 export interface ConfigSelectorCallbacks {
   onClose: () => void;

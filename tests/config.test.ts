@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { normalizeConvexUrl, loadConfig } from "../src/config/index.js";
+import { normalizeConvexUrl, loadConfig } from "../src/config/index";
 
 describe("normalizeConvexUrl", () => {
   it("converts .convex.cloud to .convex.site", () => {

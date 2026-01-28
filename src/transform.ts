@@ -1,4 +1,4 @@
-import type { SessionState, SessionPayload, MessagePayload, MessagePart } from "./types.js";
+import type { SessionState, SessionPayload, MessagePayload, MessagePart } from "./types";
 
 // Minimal type definitions for message content
 // These capture only what we need for transformation, avoiding full pi-ai type complexity in tests

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { Config } from "../types.js";
+import type { Config } from "../types";
 
 const CONFIG_DIR = join(homedir(), ".config", "pi-opensync-plugin");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");

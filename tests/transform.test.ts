@@ -7,8 +7,8 @@ import {
   countToolCalls,
   transformUserMessage,
   transformAssistantMessage,
-} from "../src/transform.js";
-import { createSessionState } from "../src/state.js";
+} from "../src/transform";
+import { createSessionState } from "../src/state";
 
 describe("generateSessionTitle", () => {
   it("returns 'Untitled' when no name and no parent", () => {

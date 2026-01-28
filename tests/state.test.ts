@@ -6,7 +6,7 @@ import {
   incrementToolCallCount,
   generateMessageId,
   updateModel,
-} from "../src/state.js";
+} from "../src/state";
 
 describe("createSessionState", () => {
   it("creates initial state with correct values", () => {
