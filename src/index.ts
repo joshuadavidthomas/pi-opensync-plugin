@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { AssistantMessage, UserMessage, ToolResultMessage } from "@mariozechner/pi-ai";
 import { loadConfig, getConfigPath } from "./config.js";
 import { SyncClient } from "./client.js";
@@ -46,6 +46,13 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
     }
   };
   
+  const notifyError = (ctx: ExtensionContext, message: string) => {
+    if (config.debug && ctx.hasUI) {
+      ctx.ui.notify(`[OpenSync] ${message}`, "error");
+    }
+    log("Error:", message);
+  };
+  
   // Register config command
   registerConfigCommand(pi, config, client);
   
@@ -71,7 +78,7 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
     const result = await client.syncSession(payload);
     
     if (!result.success) {
-      log("Failed to sync session:", result.error);
+      notifyError(ctx, `Failed to sync session: ${result.error}`);
       if (ctx.hasUI) {
         ctx.ui.setStatus("pi-opensync", ctx.ui.theme.fg("error", "● Sync error"));
       }
@@ -177,7 +184,7 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
   // Message events
   // ─────────────────────────────────────────────────────────────────────────────
   
-  pi.on("input", async (event, _ctx) => {
+  pi.on("input", async (event, ctx) => {
     if (!state) return;
     if (event.source === "extension") return; // Skip extension-injected messages
     
@@ -192,7 +199,10 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
       event.text
     );
     
-    await client.syncMessage(payload);
+    const result = await client.syncMessage(payload);
+    if (!result.success) {
+      notifyError(ctx, `Failed to sync user message: ${result.error}`);
+    }
   });
   
   pi.on("turn_end", async (event, ctx) => {
@@ -226,7 +236,10 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
       assistantMsg,
       config.syncThinking
     );
-    await client.syncMessage(payload);
+    const msgResult = await client.syncMessage(payload);
+    if (!msgResult.success) {
+      notifyError(ctx, `Failed to sync assistant message: ${msgResult.error}`);
+    }
     
     // Sync tool results
     if (config.syncToolCalls !== false && event.toolResults.length > 0) {
@@ -239,14 +252,20 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
           toolMsgId,
           toolResult as ToolResultMessage
         );
-        await client.syncMessage(toolPayload);
+        const toolSyncResult = await client.syncMessage(toolPayload);
+        if (!toolSyncResult.success) {
+          notifyError(ctx, `Failed to sync tool result: ${toolSyncResult.error}`);
+        }
       }
     }
     
     // Update session with current totals
     const sessionName = ctx.sessionManager.getSessionName();
     const sessionPayload = transformSession(state, sessionName);
-    await client.syncSession(sessionPayload);
+    const sessResult = await client.syncSession(sessionPayload);
+    if (!sessResult.success) {
+      notifyError(ctx, `Failed to update session: ${sessResult.error}`);
+    }
   });
 }
 
