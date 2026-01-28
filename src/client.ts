@@ -1,0 +1,87 @@
+import type { Config, SessionPayload, MessagePayload, SyncResult } from "./types.js";
+
+export class SyncClient {
+  private siteUrl: string;
+  private apiKey: string;
+  private debug: boolean;
+  
+  constructor(config: Config) {
+    this.siteUrl = config.convexUrl; // Already normalized
+    this.apiKey = config.apiKey;
+    this.debug = config.debug ?? false;
+  }
+  
+  private log(...args: unknown[]): void {
+    if (this.debug) {
+      console.log("[pi-opensync]", ...args);
+    }
+  }
+  
+  private async request<T>(endpoint: string, data: unknown): Promise<SyncResult & { data?: T }> {
+    const url = `${this.siteUrl}${endpoint}`;
+    
+    this.log(`POST ${endpoint}`, data);
+    
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify(data),
+      });
+      
+      if (!response.ok) {
+        const text = await response.text();
+        this.log(`Error ${response.status}:`, text);
+        return { success: false, error: `${response.status}: ${text}` };
+      }
+      
+      const result = await response.json() as T;
+      this.log("Response:", result);
+      return { success: true, data: result };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log("Request failed:", message);
+      return { success: false, error: message };
+    }
+  }
+  
+  /**
+   * Sync a session to OpenSync
+   */
+  async syncSession(session: SessionPayload): Promise<SyncResult> {
+    return this.request("/sync/session", session);
+  }
+  
+  /**
+   * Sync a message to OpenSync
+   */
+  async syncMessage(message: MessagePayload): Promise<SyncResult> {
+    return this.request("/sync/message", message);
+  }
+  
+  /**
+   * Batch sync sessions and messages
+   */
+  async syncBatch(sessions: SessionPayload[], messages: MessagePayload[]): Promise<SyncResult> {
+    return this.request("/sync/batch", { sessions, messages });
+  }
+  
+  /**
+   * Test connection to OpenSync
+   */
+  async testConnection(): Promise<SyncResult> {
+    try {
+      const response = await fetch(`${this.siteUrl}/health`);
+      if (response.ok) {
+        return { success: true };
+      }
+      return { success: false, error: `Health check failed: ${response.status}` };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { success: false, error: message };
+    }
+  }
+}

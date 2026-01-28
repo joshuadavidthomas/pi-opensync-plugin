@@ -332,11 +332,11 @@ describe("SyncClient", () => {
 ## Success Criteria:
 
 ### Automated Verification:
-- [ ] `bun test tests/client.test.ts` passes
-- [ ] `bun run typecheck` passes
+- [x] `bun test tests/client.test.ts` passes
+- [x] `bun run typecheck` passes
 
 ### Manual Verification:
-- [ ] `/opensync-config` → "Test connection" works with valid config
+- [x] `/opensync-config` → "Test connection" works with valid config
 
 ### Commit Checkpoint:
 After all verifications pass, commit with message:
