@@ -324,16 +324,85 @@ function registerConfigCommand(pi: ExtensionAPI, config: Config | null, client: 
 - [x] `bun test` passes (all tests)
 
 ### Manual Verification:
-- [ ] Start pi with extension loaded and valid config - session appears in OpenSync
-- [ ] Type a message and see it appear in OpenSync dashboard
-- [ ] Exit pi and see final session update with duration
-- [ ] Fork a session and see new session created with `[Fork::...]` prefix
-- [ ] Status shows "● OpenSync" in footer when syncing
+- [x] Start pi with extension loaded and valid config - session appears in OpenSync
+- [x] Type a message and see it appear in OpenSync dashboard
+- [x] User messages sync correctly
+- [x] Assistant messages sync correctly
+- [x] Tool calls sync with structured parts
+- [x] Tool results sync as separate messages
+- [x] Thinking blocks sync when enabled (PI_OPENSYNC_THINKING=true)
+- [x] Multiple tool calls in single message supported
+- [x] Status shows "● OpenSync" in footer when syncing
+- [x] Debug logging to JSONL file (PI_OPENSYNC_DEBUG=true)
+- [x] Exit pi and see final session update with duration (115869ms recorded)
+- [x] Fork a session and see new session created with `[Fork::...]` prefix (73 messages copied)
+- [x] Session resume restores message count correctly (prevents ID conflicts)
 
-**Implementation Note**: After completing this phase and all automated verification passes, pause here for manual confirmation from the human that the manual testing was successful before proceeding to the next phase.
+**Implementation Note**: ✅ Phase 5 complete! All automated and manual tests passed.
+
+### Message Type Verification (2026-01-28)
+
+See [Message Types Verification Report](../message-types-verification.md) for detailed findings.
+
+**Summary:**
+- ✅ All message types sync successfully to OpenSync API
+- ✅ Tool calls appear as structured parts (type: "tool-call")
+- ✅ Tool results create separate messages (role: "tool")
+- ✅ Thinking blocks sync as structured parts (type: "thinking")
+- ✅ Multiple part types can coexist in single message
+- ⚠️ OpenSync UI doesn't render thinking parts (upstream issue)
+  - UI only supports: text, tool-call, tool-result
+  - Missing: thinking rendering implementation
+  - Workaround: thinking content appears in textContent as `<thinking>...</thinking>`
+
+**Upstream Contribution Needed:**
+Add thinking part renderer to OpenSync SessionViewer component.
+
+### Issues Fixed During Implementation
+
+#### 1. Session Resume Support (2026-01-28)
+**Problem:** When resuming sessions with `/resume`, extension would start message count at 0, causing duplicate message IDs.
+
+**Solution:** Added state restoration logic in `session_start` event:
+- Check for existing messages via `ctx.sessionManager.getBranch()`
+- Restore message count, token usage, and tool call count from existing messages
+- Log `session_resume` instead of `session_start` when messages exist
+
+**Files Changed:** `src/index.ts` (lines 64-102)
+
+#### 2. Missing Session Title in Forks (2026-01-28)
+**Problem:** Forked sessions showed only `[Fork::abc123]` without "Untitled" suffix.
+
+**Solution:** Default to "Untitled" when no session name provided, matching pi's UI behavior.
+
+**Files Changed:** 
+- `src/transform.ts` - `generateSessionTitle()` uses `sessionName || "Untitled"`
+- `tests/transform.test.ts` - Updated test expectations
+
+#### 3. Text Content Hidden in Messages with Tool Calls (2026-01-28)
+**Problem:** Assistant messages with both text and tool calls only showed tool call badges in OpenSync UI, hiding the text (e.g., "Perfect! ✅ All tests pass. Now typecheck:").
+
+**Root Cause:** OpenSync UI renders either `textContent` OR `parts`, not both.
+
+**Solution:** Workaround by adding text as `{type: "text", content: "..."}` part when message also contains tool calls/thinking.
+
+**Files Changed:**
+- `src/transform.ts` - Modified `transformAssistantMessage()` to prepend text part
+- `tests/transform.test.ts` - Updated test expectations
+- `docs/opensync-ui-workarounds.md` - Documented workaround and upstream fix needed
+
+**Upstream Contribution Needed:** OpenSync UI should render both textContent AND parts simultaneously.
 
 ### Commit Checkpoint:
 After all verifications pass, commit with message:
 ```
-Add session lifecycle and message sync handlers
+feat: complete Phase 5 - session lifecycle and message sync
+
+- Implement all event handlers (session_start, session_fork, session_shutdown, input, turn_end)
+- Add session resume support with state restoration
+- Add structured parts for tool calls, tool results, and thinking blocks
+- Fix session title generation to include "Untitled" default
+- Work around OpenSync UI limitation for text+tool-call messages
+- Add JSONL debug logging
+- All automated and manual tests passing
 ```

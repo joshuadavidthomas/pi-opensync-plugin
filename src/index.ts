@@ -66,14 +66,44 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
     const model = ctx.model ? { id: ctx.model.id, provider: ctx.model.provider } : undefined;
     
     state = createSessionState(sessionId, ctx.cwd, model);
-    log({ type: "session_start", sessionId: state.externalId });
+    
+    // Check if session has existing messages (resume scenario)
+    // Restore state to avoid message ID conflicts
+    let msgCount = 0;
+    for (const entry of ctx.sessionManager.getBranch()) {
+      if (entry.type === "message") {
+        msgCount++;
+        const msg = entry.message;
+        
+        // Restore usage stats from assistant messages
+        if (msg.role === "assistant") {
+          const assistantMsg = msg as AssistantMessage;
+          if (assistantMsg.usage) {
+            state = updateSessionUsage(state, assistantMsg.usage);
+          }
+          
+          // Restore tool call count
+          const toolCalls = countToolCalls(assistantMsg.content);
+          if (toolCalls > 0) {
+            state = incrementToolCallCount(state, toolCalls);
+          }
+        }
+      }
+    }
+    
+    if (msgCount > 0) {
+      state = { ...state, messageCount: msgCount };
+      log({ type: "session_resume", sessionId: state.externalId, messageCount: msgCount, promptTokens: state.promptTokens, completionTokens: state.completionTokens });
+    } else {
+      log({ type: "session_start", sessionId: state.externalId });
+    }
     
     // Update status
     if (ctx.hasUI) {
       ctx.ui.setStatus("pi-opensync", ctx.ui.theme.fg("dim", "● OpenSync"));
     }
     
-    // Sync initial session
+    // Sync session (resume will update existing, new will create)
     const sessionName = ctx.sessionManager.getSessionName();
     const payload = transformSession(state, sessionName);
     const result = await client.syncSession(payload);
@@ -147,7 +177,9 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
     
     if (messages.length > 0) {
       log({ type: "batch_sync", messageCount: messages.length, reason: "fork" });
-      await client.syncBatch([], messages);
+      // Remove createdAt from messages - batch endpoint doesn't accept it
+      const batchMessages = messages.map(({ createdAt, ...rest }) => rest);
+      await client.syncBatch([], batchMessages);
     }
     
     // Sync updated session with totals
@@ -164,11 +196,6 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
     const sessionName = ctx.sessionManager.getSessionName();
     const payload = transformSession(state, sessionName, true);
     await client.syncSession(payload);
-    
-    // Clear status
-    if (ctx.hasUI) {
-      ctx.ui.setStatus("pi-opensync", undefined);
-    }
     
     state = null;
   });

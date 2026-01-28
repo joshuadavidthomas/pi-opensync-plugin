@@ -60,10 +60,15 @@ A fully functional pi extension that:
 
 After implementation is complete, we need to contribute back to OpenSync:
 
+### High Priority
+- **Fix text+parts rendering** - UI should render both `textContent` AND `parts`, not either/or (see `docs/opensync-ui-workarounds.md`)
+- **Add thinking part renderer** - UI doesn't display `{type: "thinking"}` parts (see `docs/message-types-verification.md`)
 - **Add "pi" as recognized source** - Currently displays as "opencode" in dashboard
-- Other improvements may be identified during testing and real-world usage
 
-These are tracked separately and don't block the extension implementation.
+### Details
+See `docs/opensync-ui-workarounds.md` for detailed technical explanation of issues and proposed fixes.
+
+These are tracked separately and don't block the extension implementation. The extension works correctly; these are UI-only improvements.
 
 ## Implementation Approach
 
@@ -135,7 +140,7 @@ For production use, users will clone/copy to `~/.pi/agent/extensions/pi-opensync
 | 2 | Configuration Management | [phase02.md](./2026-01-28-pi-sync-extension-phase02.md) | ✅ Complete |
 | 3 | OpenSync API Client | [phase03.md](./2026-01-28-pi-sync-extension-phase03.md) | ✅ Complete |
 | 4 | State Management & Data Transformation | [phase04.md](./2026-01-28-pi-sync-extension-phase04.md) | ✅ Complete |
-| 5 | Session Lifecycle & Message Event Handlers | [phase05.md](./2026-01-28-pi-sync-extension-phase05.md) | Planned |
+| 5 | Session Lifecycle & Message Event Handlers | [phase05.md](./2026-01-28-pi-sync-extension-phase05.md) | ✅ Complete |
 | 6 | Interactive Configuration Command | [phase06.md](./2026-01-28-pi-sync-extension-phase06.md) | Planned |
 | 7 | Documentation & Polish | [phase07.md](./2026-01-28-pi-sync-extension-phase07.md) | Planned |
 

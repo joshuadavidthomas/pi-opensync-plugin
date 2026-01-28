@@ -14,9 +14,9 @@ import {
 import { createSessionState } from "../src/state.js";
 
 describe("generateSessionTitle", () => {
-  it("returns undefined when no name and no parent", () => {
+  it("returns 'Untitled' when no name and no parent", () => {
     const state = createSessionState("s1", "/path");
-    expect(generateSessionTitle(state)).toBeUndefined();
+    expect(generateSessionTitle(state)).toBe("Untitled");
   });
   
   it("returns session name when no parent", () => {
@@ -29,9 +29,9 @@ describe("generateSessionTitle", () => {
     expect(generateSessionTitle(state, "My Session")).toBe("[Fork::parent-1] My Session");
   });
   
-  it("returns just fork prefix when no name but has parent", () => {
+  it("adds 'Untitled' with fork prefix when no name but has parent", () => {
     const state = createSessionState("s1", "/path", undefined, "abcd1234-5678");
-    expect(generateSessionTitle(state)).toBe("[Fork::abcd1234]");
+    expect(generateSessionTitle(state)).toBe("[Fork::abcd1234] Untitled");
   });
 });
 
@@ -300,8 +300,13 @@ describe("transformAssistantMessage", () => {
     const payload = transformAssistantMessage("session-123", "msg-2", message);
     
     expect(payload.textContent).toBe("I'll read the file");
-    expect(payload.parts).toHaveLength(1);
+    // Text + tool call = 2 parts (workaround for OpenSync UI)
+    expect(payload.parts).toHaveLength(2);
     expect(payload.parts![0]).toEqual({
+      type: "text",
+      content: "I'll read the file",
+    });
+    expect(payload.parts![1]).toEqual({
       type: "tool-call",
       content: {
         toolName: "read",
@@ -324,8 +329,13 @@ describe("transformAssistantMessage", () => {
     const payload = transformAssistantMessage("session-123", "msg-2", message, true);
     
     expect(payload.textContent).toBe("<thinking>Let me analyze...</thinking>\nThe answer is 42");
-    expect(payload.parts).toHaveLength(1);
+    // Text + thinking = 2 parts (workaround for OpenSync UI)
+    expect(payload.parts).toHaveLength(2);
     expect(payload.parts![0]).toEqual({
+      type: "text",
+      content: "<thinking>Let me analyze...</thinking>\nThe answer is 42",
+    });
+    expect(payload.parts![1]).toEqual({
       type: "thinking",
       content: "Let me analyze...",
     });
@@ -362,9 +372,11 @@ describe("transformAssistantMessage", () => {
     
     const payload = transformAssistantMessage("session-123", "msg-2", message, true);
     
-    expect(payload.parts).toHaveLength(2);
-    expect(payload.parts![0].type).toBe("tool-call");
-    expect(payload.parts![1].type).toBe("thinking");
+    // Text + tool call + thinking = 3 parts (workaround for OpenSync UI)
+    expect(payload.parts).toHaveLength(3);
+    expect(payload.parts![0].type).toBe("text");
+    expect(payload.parts![1].type).toBe("tool-call");
+    expect(payload.parts![2].type).toBe("thinking");
   });
 });
 

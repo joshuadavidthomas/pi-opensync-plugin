@@ -55,11 +55,12 @@ export function generateSessionTitle(
   state: SessionState,
   sessionName?: string
 ): string | undefined {
-  let title = sessionName;
+  // Use provided name, or "Untitled" as fallback (matching pi's default)
+  let title = sessionName || "Untitled";
   
   if (state.parentExternalId) {
     const prefix = `[Fork::${state.parentExternalId.slice(0, 8)}]`;
-    title = title ? `${prefix} ${title}` : prefix;
+    title = `${prefix} ${title}`;
   }
   
   return title;
@@ -245,13 +246,20 @@ export function transformAssistantMessage(
   // Add structured parts for tool calls and thinking
   const parts: MessagePart[] = [];
   
+  // If there's text content AND we have tool calls/thinking, add text as a part first
+  // This works around OpenSync UI limitation where it only renders parts OR textContent, not both
   const toolCallParts = extractToolCallParts(message.content);
-  parts.push(...toolCallParts);
+  const thinkingParts = includeThinking ? extractThinkingParts(message.content) : [];
   
-  if (includeThinking) {
-    const thinkingParts = extractThinkingParts(message.content);
-    parts.push(...thinkingParts);
+  if (textContent && (toolCallParts.length > 0 || thinkingParts.length > 0)) {
+    parts.push({
+      type: "text",
+      content: textContent,
+    });
   }
+  
+  parts.push(...toolCallParts);
+  parts.push(...thinkingParts);
   
   if (parts.length > 0) {
     payload.parts = parts;
