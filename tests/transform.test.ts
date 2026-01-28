@@ -5,6 +5,7 @@ import {
   extractUserMessageText,
   extractAssistantMessageText,
   countToolCalls,
+  extractToolCallParts,
   transformUserMessage,
   transformAssistantMessage,
   transformToolResultMessage,
@@ -168,6 +169,39 @@ describe("countToolCalls", () => {
   });
 });
 
+describe("extractToolCallParts", () => {
+  it("extracts tool calls as structured parts", () => {
+    const content = [
+      { type: "text" as const, text: "I'll read the file" },
+      { type: "toolCall" as const, id: "tc1", name: "read", arguments: { path: "foo.txt" } },
+      { type: "toolCall" as const, id: "tc2", name: "write", arguments: { path: "bar.txt", content: "data" } },
+    ];
+    
+    const parts = extractToolCallParts(content);
+    
+    expect(parts).toHaveLength(2);
+    expect(parts[0]).toEqual({
+      type: "tool-call",
+      content: {
+        toolName: "read",
+        args: { path: "foo.txt" },
+      },
+    });
+    expect(parts[1]).toEqual({
+      type: "tool-call",
+      content: {
+        toolName: "write",
+        args: { path: "bar.txt", content: "data" },
+      },
+    });
+  });
+  
+  it("returns empty array when no tool calls", () => {
+    const content = [{ type: "text" as const, text: "Hello" }];
+    expect(extractToolCallParts(content)).toEqual([]);
+  });
+});
+
 describe("transformUserMessage", () => {
   it("creates user message payload", () => {
     const payload = transformUserMessage(
@@ -207,6 +241,7 @@ describe("transformAssistantMessage", () => {
     expect(payload.model).toBe("claude-sonnet-4-5");
     expect(payload.promptTokens).toBe(100);
     expect(payload.completionTokens).toBe(50);
+    expect(payload.parts).toBeUndefined();
   });
   
   it("handles message without usage", () => {
@@ -222,10 +257,34 @@ describe("transformAssistantMessage", () => {
     expect(payload.promptTokens).toBeUndefined();
     expect(payload.completionTokens).toBeUndefined();
   });
+  
+  it("includes tool call parts when message has tool calls", () => {
+    const message = {
+      role: "assistant" as const,
+      content: [
+        { type: "text" as const, text: "I'll read the file" },
+        { type: "toolCall" as const, id: "tc1", name: "read", arguments: { path: "test.txt" } },
+      ],
+      model: "claude-sonnet-4-5",
+      timestamp: 1706400000000,
+    };
+    
+    const payload = transformAssistantMessage("session-123", "msg-2", message);
+    
+    expect(payload.textContent).toBe("I'll read the file");
+    expect(payload.parts).toHaveLength(1);
+    expect(payload.parts![0]).toEqual({
+      type: "tool-call",
+      content: {
+        toolName: "read",
+        args: { path: "test.txt" },
+      },
+    });
+  });
 });
 
 describe("transformToolResultMessage", () => {
-  it("creates tool result message payload", () => {
+  it("creates tool result message payload with parts", () => {
     const toolResult = {
       role: "toolResult" as const,
       toolName: "read",
@@ -244,5 +303,10 @@ describe("transformToolResultMessage", () => {
     expect(payload.role).toBe("tool");
     expect(payload.textContent).toBe("[read]\nfile contents here");
     expect(payload.createdAt).toBe(1706400000000);
+    expect(payload.parts).toHaveLength(1);
+    expect(payload.parts![0]).toEqual({
+      type: "tool-result",
+      content: "file contents here",
+    });
   });
 });

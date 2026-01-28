@@ -1,4 +1,4 @@
-import type { SessionState, SessionPayload, MessagePayload } from "./types.js";
+import type { SessionState, SessionPayload, MessagePayload, MessagePart } from "./types.js";
 
 // Minimal type definitions for message content
 // These capture only what we need for transformation, avoiding full pi-ai type complexity in tests
@@ -161,6 +161,27 @@ export function countToolCalls(content: AssistantContentPart[]): number {
 }
 
 /**
+ * Extract tool calls as structured parts for OpenSync
+ */
+export function extractToolCallParts(content: AssistantContentPart[]): MessagePart[] {
+  const parts: MessagePart[] = [];
+  
+  for (const part of content) {
+    if (part.type === "toolCall") {
+      parts.push({
+        type: "tool-call",
+        content: {
+          toolName: part.name,
+          args: part.arguments,
+        },
+      });
+    }
+  }
+  
+  return parts;
+}
+
+/**
  * Transform a user input to OpenSync message payload
  */
 export function transformUserMessage(
@@ -203,6 +224,12 @@ export function transformAssistantMessage(
     payload.completionTokens = message.usage.output;
   }
   
+  // Add structured parts for tool calls
+  const toolCallParts = extractToolCallParts(message.content);
+  if (toolCallParts.length > 0) {
+    payload.parts = toolCallParts;
+  }
+  
   return payload;
 }
 
@@ -220,11 +247,19 @@ export function transformToolResultMessage(
     .filter((part): part is TextContent => part.type === "text")
     .map(part => part.text);
   
+  const resultText = textParts.join("\n");
+  
   return {
     sessionExternalId: sessionId,
     externalId: messageId,
     role: "tool",
-    textContent: `[${toolResult.toolName}]\n${textParts.join("\n")}`,
+    textContent: `[${toolResult.toolName}]\n${resultText}`,
     createdAt: timestamp,
+    parts: [
+      {
+        type: "tool-result",
+        content: resultText,
+      },
+    ],
   };
 }

@@ -36,6 +36,14 @@ export interface SessionPayload {
 }
 
 /**
+ * Message part for structured content (tool calls, results, etc.)
+ */
+export interface MessagePart {
+  type: string;
+  content: unknown;
+}
+
+/**
  * Message data for OpenSync API
  */
 export interface MessagePayload {
@@ -48,6 +56,7 @@ export interface MessagePayload {
   completionTokens?: number;
   durationMs?: number;
   createdAt?: number;
+  parts?: MessagePart[];
 }
 
 /**
