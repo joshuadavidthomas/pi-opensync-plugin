@@ -1,270 +1,297 @@
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import type { AssistantMessage, UserMessage, ToolResultMessage } from "@mariozechner/pi-ai";
-import { Config, loadConfig, ConfigSelectorComponent } from "./config";
+import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@mariozechner/pi-coding-agent";
+import type { AssistantMessage, ToolResultMessage } from "@mariozechner/pi-ai";
+import { loadConfig, normalizeConvexUrl, ConfigSelectorComponent } from "./config";
 import { SyncClient } from "./client";
-import { debugLog } from "./debug";
-import { SessionState } from "./state";
-import {
-  transformSession,
-  transformUserMessage,
-  transformAssistantMessage,
-  extractUserMessageText,
-  countToolCalls,
-} from "./transform";
-import type { MessagePayload } from "./client";
+import type { MessageData, ToolResultData } from "./client";
 
-export default function piOpensyncPlugin(pi: ExtensionAPI) {
-  const config = loadConfig();
+/**
+ * Session state tracked in memory during a session's lifetime.
+ * Accumulates usage statistics and message counts for sync updates.
+ */
+interface SessionState {
+  sessionId: string;
+  parentSessionId?: string;
+  projectPath: string;
+  model?: string;
+  provider?: string;
+  promptTokens: number;
+  completionTokens: number;
+  cost: number;
+  messageCount: number;
+  toolCallCount: number;
+  startedAt: number;
+}
 
-  if (!config) {
-    // Not configured - register config command only
-    registerConfigCommand(pi, null, null);
-    return;
-  }
+/**
+ * Stats accumulated from processing a branch of messages.
+ */
+interface BranchStats {
+  messageCount: number;
+  promptTokens: number;
+  completionTokens: number;
+  cost: number;
+  toolCallCount: number;
+}
 
-  if (config.autoSync === false) {
-    if (config.debug) {
-      debugLog({ type: "init", message: "Auto-sync disabled in config" });
+/**
+ * Process existing messages in a branch to extract stats and build message payloads.
+ * Used when resuming a session or processing a fork to sync existing messages.
+ */
+function processBranch(
+  branch: SessionEntry[],
+  sessionId: string,
+  includeThinking: boolean
+): { stats: BranchStats; messages: MessageData[] } {
+  const stats: BranchStats = {
+    messageCount: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    cost: 0,
+    toolCallCount: 0,
+  };
+  const messages: MessageData[] = [];
+
+  for (const entry of branch) {
+    if (entry.type !== "message") continue;
+
+    const msg = entry.message;
+
+    // Skip tool results - we only sync user and assistant messages
+    if (msg.role !== "user" && msg.role !== "assistant") continue;
+
+    stats.messageCount++;
+
+    if (msg.role === "user") {
+      const userMsg = msg;
+      const text =
+        typeof userMsg.content === "string"
+          ? userMsg.content
+          : userMsg.content
+            .filter((p) => p.type === "text")
+            .map((p) => (p as { text: string }).text)
+            .join("\n");
+
+      messages.push({
+        role: "user",
+        sessionId,
+        messageId: `${sessionId}-user-${stats.messageCount}`,
+        text,
+        timestamp: userMsg.timestamp,
+      });
+    } else if (msg.role === "assistant") {
+      const assistantMsg = msg;
+
+      messages.push({
+        role: "assistant",
+        sessionId,
+        messageId: `${sessionId}-assistant-${stats.messageCount}`,
+        content: assistantMsg.content,
+        model: assistantMsg.model,
+        timestamp: assistantMsg.timestamp,
+        usage: assistantMsg.usage,
+        includeThinking,
+      });
+
+      if (assistantMsg.usage) {
+        stats.promptTokens += assistantMsg.usage.input;
+        stats.completionTokens += assistantMsg.usage.output;
+        stats.cost += assistantMsg.usage.cost.total;
+      }
+      stats.toolCallCount += assistantMsg.content.filter((p) => p.type === "toolCall").length;
     }
-    registerConfigCommand(pi, config, null);
-    return;
   }
+
+  return { stats, messages };
+}
+
+/**
+ * Main plugin entry point. Registers event handlers for session lifecycle
+ * and message events to sync with OpenSync.
+ */
+export default function piOpensyncPlugin(pi: ExtensionAPI) {
+  registerConfigCommand(pi);
+
+  const config = loadConfig();
+  if (!config) return;
+  if (config.autoSync === false) return;
 
   const client = new SyncClient(config);
   let state: SessionState | null = null;
 
-  const log = (entry: Record<string, unknown>) => {
-    if (config.debug) {
-      debugLog(entry);
-    }
-  };
-
-  const notifyError = (ctx: ExtensionContext, message: string) => {
-    if (config.debug && ctx.hasUI) {
-      ctx.ui.notify(`[OpenSync] ${message}`, "error");
-    }
-    log({ type: "error", message });
-  };
-
-  registerConfigCommand(pi, config, client);
-
   pi.on("session_start", async (_event, ctx) => {
     const sessionId = ctx.sessionManager.getSessionId();
-    const model = ctx.model ? { id: ctx.model.id, provider: ctx.model.provider } : undefined;
 
-    state = new SessionState(sessionId, ctx.cwd, model);
+    // Process existing messages to restore stats (resume scenario)
+    const { stats } = processBranch(
+      ctx.sessionManager.getBranch(),
+      sessionId,
+      config.syncThinking
+    );
 
-    // Check if session has existing messages (resume scenario)
-    // Restore state to avoid message ID conflicts
-    let msgCount = 0;
-    for (const entry of ctx.sessionManager.getBranch()) {
-      if (entry.type === "message") {
-        msgCount++;
-        const msg = entry.message;
+    state = {
+      sessionId,
+      projectPath: ctx.cwd,
+      model: ctx.model?.id,
+      provider: ctx.model?.provider,
+      ...stats,
+      startedAt: Date.now(),
+    };
 
-        // Restore usage stats from assistant messages
-        if (msg.role === "assistant") {
-          const assistantMsg = msg as AssistantMessage;
-          if (assistantMsg.usage) {
-            state.updateUsage(assistantMsg.usage);
-          }
-
-          // Restore tool call count
-          const toolCalls = countToolCalls(assistantMsg.content);
-          if (toolCalls > 0) {
-            state.incrementToolCallCount(toolCalls);
-          }
-        }
-      }
-    }
-
-    if (msgCount > 0) {
-      state.messageCount = msgCount;
-      log({ type: "session_resume", sessionId: state.externalId, messageCount: msgCount, promptTokens: state.promptTokens, completionTokens: state.completionTokens });
-    } else {
-      log({ type: "session_start", sessionId: state.externalId });
-    }
-
-    // Update status
     if (ctx.hasUI) {
       ctx.ui.setStatus("pi-opensync", ctx.ui.theme.fg("dim", "● OpenSync"));
     }
 
-    // Sync session (resume will update existing, new will create)
-    const sessionName = ctx.sessionManager.getSessionName();
-    const payload = transformSession(state, sessionName);
-    const result = await client.syncSession(payload);
+    const result = await client.syncSession({
+      ...state,
+      title: ctx.sessionManager.getSessionName(),
+    });
 
     if (!result.success) {
       notifyError(ctx, `Failed to sync session: ${result.error}`);
-      if (ctx.hasUI) {
-        ctx.ui.setStatus("pi-opensync", ctx.ui.theme.fg("error", "● Sync error"));
-      }
     }
   });
 
   pi.on("session_fork", async (_event, ctx) => {
-    // Get the parent session ID before we create new state
-    const parentExternalId = state?.externalId;
-
+    const parentSessionId = state?.sessionId;
     const sessionId = ctx.sessionManager.getSessionId();
-    const model = ctx.model ? { id: ctx.model.id, provider: ctx.model.provider } : undefined;
 
-    state = new SessionState(sessionId, ctx.cwd, model, parentExternalId);
-    log({ type: "session_fork", sessionId: state.externalId, parentSessionId: parentExternalId });
+    // Process existing messages to get stats and build message payloads
+    const { stats, messages } = processBranch(
+      ctx.sessionManager.getBranch(),
+      sessionId,
+      config.syncThinking
+    );
 
-    // Sync new forked session
-    const sessionName = ctx.sessionManager.getSessionName();
-    const payload = transformSession(state, sessionName);
-    await client.syncSession(payload);
+    state = {
+      sessionId,
+      parentSessionId,
+      projectPath: ctx.cwd,
+      model: ctx.model?.id,
+      provider: ctx.model?.provider,
+      ...stats,
+      startedAt: Date.now(),
+    };
 
-    // Batch sync all existing messages in the fork
-    const messages: MessagePayload[] = [];
-    let msgCount = 0;
-
-    for (const entry of ctx.sessionManager.getBranch()) {
-      if (entry.type === "message") {
-        const msg = entry.message;
-        msgCount++;
-
-        if (msg.role === "user") {
-          const userMsg = msg as UserMessage;
-          const text = extractUserMessageText(userMsg.content);
-          messages.push(transformUserMessage(
-            sessionId,
-            state.generateMessageId("user"),
-            text,
-            userMsg.timestamp
-          ));
-        } else if (msg.role === "assistant") {
-          const assistantMsg = msg as AssistantMessage;
-          messages.push(transformAssistantMessage(
-            sessionId,
-            state.generateMessageId("assistant"),
-            assistantMsg,
-            config.syncThinking
-          ));
-
-          // Update state with usage
-          if (assistantMsg.usage) {
-            state.updateUsage(assistantMsg.usage);
-          }
-
-          // Count tool calls
-          const toolCalls = countToolCalls(assistantMsg.content);
-          if (toolCalls > 0) {
-            state.incrementToolCallCount(toolCalls);
-          }
-        }
-      }
-    }
-
-    // Update message count
-    state.messageCount = msgCount;
+    await client.syncSession({
+      ...state,
+      title: ctx.sessionManager.getSessionName(),
+    });
 
     if (messages.length > 0) {
-      log({ type: "batch_sync", messageCount: messages.length, reason: "fork" });
-      // Remove createdAt from messages - batch endpoint doesn't accept it
-      const batchMessages = messages.map(({ createdAt, ...rest }) => rest);
-      await client.syncBatch([], batchMessages);
+      await client.syncBatch(messages);
     }
 
-    // Sync updated session with totals
-    const updatedPayload = transformSession(state, sessionName);
-    await client.syncSession(updatedPayload);
+    await client.syncSession({
+      ...state,
+      title: ctx.sessionManager.getSessionName(),
+    });
   });
 
+  /** Sync final session state on shutdown */
   pi.on("session_shutdown", async (_event, ctx) => {
     if (!state) return;
 
-    log({ type: "session_shutdown", sessionId: state.externalId });
-
-    // Sync final session state
-    const sessionName = ctx.sessionManager.getSessionName();
-    const payload = transformSession(state, sessionName, true);
-    await client.syncSession(payload);
+    await client.syncSession({
+      ...state,
+      title: ctx.sessionManager.getSessionName(),
+      isFinal: true,
+    });
 
     state = null;
   });
 
-  // Model change tracking
+  /** Track model changes for session metadata */
   pi.on("model_select", async (event, _ctx) => {
     if (!state) return;
-
-    state.updateModel({ id: event.model.id, provider: event.model.provider });
-    log({ type: "model_change", model: state.model, provider: state.provider });
+    state.model = event.model.id;
+    state.provider = event.model.provider;
   });
 
+  /** Sync user messages as they're sent */
   pi.on("input", async (event, ctx) => {
     if (!state) return;
-    if (event.source === "extension") return; // Skip extension-injected messages
+    if (event.source === "extension") return;
 
-    state.incrementMessageCount();
-    const messageId = state.generateMessageId("user");
+    state.messageCount++;
 
-    log({ type: "user_message", messageId, messageCount: state.messageCount });
+    const result = await client.syncMessage({
+      role: "user",
+      sessionId: state.sessionId,
+      messageId: `${state.sessionId}-user-${state.messageCount}`,
+      text: event.text,
+    });
 
-    const payload = transformUserMessage(
-      state.externalId,
-      messageId,
-      event.text
-    );
-
-    const result = await client.syncMessage(payload);
     if (!result.success) {
-      notifyError(ctx, `Failed to sync user message: ${result.error}`);
+      notifyError(ctx, `Failed to sync message: ${result.error}`);
     }
   });
 
+  /** Sync assistant messages and update session stats after each turn */
   pi.on("turn_end", async (event, ctx) => {
     if (!state) return;
+    if (event.message.role !== "assistant") return;
 
-    const msg = event.message;
-    if (msg.role !== "assistant") return;
+    const msg = event.message as AssistantMessage;
 
-    const assistantMsg = msg as AssistantMessage;
+    state.messageCount++;
 
-    state.incrementMessageCount();
-    const messageId = state.generateMessageId("assistant");
-
-    log({ type: "assistant_message", messageId, messageCount: state.messageCount });
-
-    // Update usage
-    if (assistantMsg.usage) {
-      state.updateUsage(assistantMsg.usage);
+    if (msg.usage) {
+      state.promptTokens += msg.usage.input;
+      state.completionTokens += msg.usage.output;
+      state.cost += msg.usage.cost.total;
     }
+    state.toolCallCount += msg.content.filter((p) => p.type === "toolCall").length;
 
-    // Count and track tool calls
-    const toolCalls = countToolCalls(assistantMsg.content);
-    if (toolCalls > 0) {
-      state.incrementToolCallCount(toolCalls);
-    }
+    // Convert tool results to our format
+    const toolResults: ToolResultData[] =
+      config.syncToolCalls !== false
+        ? (event.toolResults as ToolResultMessage[]).map((tr) => ({
+          toolName: tr.toolName,
+          content: tr.content.filter((c) => c.type === "text") as { type: "text"; text: string }[],
+        }))
+        : [];
 
-    // Sync assistant message with tool results included as parts (if enabled)
-    const toolResults = (config.syncToolCalls !== false) ? event.toolResults as ToolResultMessage[] : [];
-    const payload = transformAssistantMessage(
-      state.externalId,
-      messageId,
-      assistantMsg,
-      config.syncThinking,
-      toolResults
-    );
-    const msgResult = await client.syncMessage(payload);
+    const msgResult = await client.syncMessage({
+      role: "assistant",
+      sessionId: state.sessionId,
+      messageId: `${state.sessionId}-assistant-${state.messageCount}`,
+      content: msg.content,
+      model: msg.model,
+      timestamp: msg.timestamp,
+      usage: msg.usage,
+      toolResults,
+      includeThinking: config.syncThinking,
+    });
+
     if (!msgResult.success) {
-      notifyError(ctx, `Failed to sync assistant message: ${msgResult.error}`);
+      notifyError(ctx, `Failed to sync message: ${msgResult.error}`);
     }
 
-    // Update session with current totals
-    const sessionName = ctx.sessionManager.getSessionName();
-    const sessionPayload = transformSession(state, sessionName);
-    const sessResult = await client.syncSession(sessionPayload);
+    const sessResult = await client.syncSession({
+      ...state,
+      title: ctx.sessionManager.getSessionName(),
+    });
+
     if (!sessResult.success) {
       notifyError(ctx, `Failed to update session: ${sessResult.error}`);
     }
   });
 }
 
-function registerConfigCommand(pi: ExtensionAPI, currentConfig: Config | null, _client: SyncClient | null) {
+/**
+ * Display an error notification and update status bar to show error state.
+ */
+function notifyError(ctx: ExtensionContext, message: string) {
+  if (ctx.hasUI) {
+    ctx.ui.notify(`[OpenSync] ${message}`, "error");
+    ctx.ui.setStatus("pi-opensync", ctx.ui.theme.fg("error", "● Sync error"));
+  }
+}
+
+/**
+ * Register the /opensync:config command for interactive configuration.
+ */
+function registerConfigCommand(pi: ExtensionAPI) {
   pi.registerCommand("opensync:config", {
     description: "Configure OpenSync sync settings",
     handler: async (_args, ctx) => {
@@ -273,36 +300,41 @@ function registerConfigCommand(pi: ExtensionAPI, currentConfig: Config | null, _
         return;
       }
 
-      // If no config, show setup prompt
+      const currentConfig = loadConfig();
+
       if (!currentConfig) {
-        const setup = await ctx.ui.confirm(
-          "No Configuration",
-          "OpenSync is not configured. Set up now?"
-        );
+        const setup = await ctx.ui.confirm("No Configuration", "OpenSync is not configured. Set up now?");
         if (!setup) return;
       }
 
       await ctx.ui.custom<void>((tui, _theme, _kb, done) => {
+        const testConnection = async () => {
+          const cfg = currentConfig ?? {
+            convexUrl: "",
+            apiKey: "",
+            autoSync: true,
+            syncToolCalls: true,
+            syncThinking: false,
+            debug: false,
+          };
+          const client = new SyncClient({
+            ...cfg,
+            convexUrl: normalizeConvexUrl(cfg.convexUrl),
+          });
+          return client.testConnection();
+        };
+
         const component = new ConfigSelectorComponent(
           currentConfig,
           ctx,
-          {
-            onClose: () => done(),
-            requestRender: () => tui.requestRender(),
-          }
+          { onClose: () => done(), requestRender: () => tui.requestRender() },
+          testConnection
         );
 
         return {
-          render(width: number) {
-            return component.render(width);
-          },
-          invalidate() {
-            component.invalidate();
-          },
-          handleInput(data: string) {
-            component.handleInput(data);
-            tui.requestRender();
-          },
+          render(width: number) { return component.render(width); },
+          invalidate() { component.invalidate(); },
+          handleInput(data: string) { component.handleInput(data); tui.requestRender(); },
         };
       });
     },
