@@ -143,3 +143,6 @@ dist
 
 # End of https://www.toptal.com/developers/gitignore/api/node
 .pi/opensync-debug.jsonl
+
+# Reference implementations (not tracked)
+ref/
