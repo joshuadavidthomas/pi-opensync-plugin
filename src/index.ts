@@ -130,8 +130,8 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
     state = {
       sessionId: ctx.sessionManager.getSessionId(),
       projectPath: ctx.cwd,
-      model: ctx.model?.id,
-      provider: ctx.model?.provider,
+      model: ctx.model?.name,
+      provider: ctx.model?.provider?.replace(/-/g, " "),
       ...stats,
       startedAt: Date.now(),
     };
@@ -154,8 +154,8 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
       sessionId: ctx.sessionManager.getSessionId(),
       parentSessionId,
       projectPath: ctx.cwd,
-      model: ctx.model?.id,
-      provider: ctx.model?.provider,
+      model: ctx.model?.name,
+      provider: ctx.model?.provider?.replace(/-/g, " "),
       ...stats,
       startedAt: Date.now(),
     };
@@ -185,8 +185,8 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
    */
   pi.on("model_select", async (event, _ctx) => {
     if (!state) return;
-    state.model = event.model.id;
-    state.provider = event.model.provider;
+    state.model = event.model.name;
+    state.provider = event.model.provider.replace(/-/g, " ");
   });
 
   /**
