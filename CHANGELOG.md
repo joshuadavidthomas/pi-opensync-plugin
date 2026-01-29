@@ -26,6 +26,11 @@ For multi-package releases, use package names as subsections:
 
 ## [Unreleased]
 
+### Changed
+
+- Changed model sync to send model name instead of model ID for better readability in OpenSync dashboards
+- Changed provider sync to replace hyphens with spaces (e.g., `anthropic-bedrock` → `anthropic bedrock`)
+
 ## [0.1.0]
 
 ### Added
