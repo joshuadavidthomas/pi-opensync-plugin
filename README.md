@@ -50,37 +50,20 @@ git clone https://github.com/joshuadavidthomas/pi-opensync-plugin ~/.pi/agent/ex
 
 ## Configuration
 
-Once installed, run `/opensync:config` in pi to interactively configure the extension.
+Once installed, run `/opensync:config` in pi to interactively configure the extension. At a minimum, the Convex URL and API key from OpenSync is required -- both can be found on the [settings page](https://www.opensync.dev/settings).
 
-Two options are required: `convexUrl` (your OpenSync deployment URL) and `apiKey` (your OpenSync API key).
+The config file is located at `~/.config/pi-opensync-plugin/config.json`.
 
-### Manual Configuration
+### Available Options
 
-Create `~/.config/pi-opensync-plugin/config.json`:
-
-```json
-{
-  "apiKey": "osk_your_api_key_here",
-  "autoSync": true,
-  "convexUrl": "https://your-opensync-deployment.convex.cloud",
-  "debug": false,
-  "syncThinking": false,
-  "syncToolCalls": false
-}
-```
-
-### Environment Variables
-
-Environment variables take precedence over config file:
-
-| Variable | Description |
-|----------|-------------|
-| `PI_OPENSYNC_API_KEY` | Your OpenSync API key (osk_...) |
-| `PI_OPENSYNC_AUTO_SYNC` | Enable automatic syncing (default: true) |
-| `PI_OPENSYNC_CONVEX_URL` | OpenSync Convex deployment URL |
-| `PI_OPENSYNC_DEBUG` | Enable debug logging (default: false) |
-| `PI_OPENSYNC_THINKING` | Include thinking content (default: false) |
-| `PI_OPENSYNC_TOOL_CALLS` | Sync tool calls (default: false) |
+| Config File | Environment Variable | Description | Default | Required? |
+|-|-|-|-|-|
+| `apiKey` | `PI_OPENSYNC_API_KEY` | Your OpenSync API key (osk_...) | | ✅ |
+| `autoSync` | `PI_OPENSYNC_AUTO_SYNC` | Enable automatic syncing | `true` | |
+| `convexUrl` | `PI_OPENSYNC_CONVEX_URL` | OpenSync Convex deployment URL | | ✅ |
+| `debug` | `PI_OPENSYNC_DEBUG` | Enable debug logging | `false` | |
+| `syncThinking` | `PI_OPENSYNC_THINKING` | Include thinking content | `false` | |
+| `syncToolCalls` | `PI_OPENSYNC_TOOL_CALLS` | Sync tool calls | `false` | |
 
 ## How It Works
 
