@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { AssistantMessage, ToolResultMessage } from "@mariozechner/pi-ai";
-import { loadConfig, normalizeConvexUrl, ConfigSelectorComponent } from "./config";
+import { loadConfig, ConfigSelectorComponent } from "./config";
 import { SyncClient } from "./client";
 import type { MessageData, ToolResultData } from "./client";
 
@@ -284,27 +284,10 @@ function registerConfigCommand(pi: ExtensionAPI) {
       }
 
       await ctx.ui.custom<void>((tui, _theme, _kb, done) => {
-        const testConnection = async () => {
-          const cfg = currentConfig ?? {
-            convexUrl: "",
-            apiKey: "",
-            autoSync: true,
-            syncToolCalls: true,
-            syncThinking: false,
-            debug: false,
-          };
-          const client = new SyncClient({
-            ...cfg,
-            convexUrl: normalizeConvexUrl(cfg.convexUrl),
-          });
-          return client.testConnection();
-        };
-
         const component = new ConfigSelectorComponent(
           currentConfig,
           ctx,
-          { onClose: () => done(), requestRender: () => tui.requestRender() },
-          testConnection
+          { onClose: () => done(), requestRender: () => tui.requestRender() }
         );
 
         return {

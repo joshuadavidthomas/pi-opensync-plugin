@@ -178,9 +178,10 @@ export class SyncClient {
   private debug: boolean;
 
   constructor(config: Config) {
-    this.siteUrl = config.convexUrl;
     this.apiKey = config.apiKey;
     this.debug = config.debug;
+    // Convex dashboard shows .convex.cloud URLs, but HTTP endpoints use .convex.site
+    this.siteUrl = config.convexUrl.replace(".convex.cloud", ".convex.site");
   }
 
   /**

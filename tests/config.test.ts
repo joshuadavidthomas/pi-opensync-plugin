@@ -1,23 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { normalizeConvexUrl, loadConfig } from "../src/config";
-
-describe("normalizeConvexUrl", () => {
-  it("converts .convex.cloud to .convex.site", () => {
-    const input = "https://my-app-123.convex.cloud";
-    const expected = "https://my-app-123.convex.site";
-    expect(normalizeConvexUrl(input)).toBe(expected);
-  });
-  
-  it("leaves .convex.site unchanged", () => {
-    const input = "https://my-app-123.convex.site";
-    expect(normalizeConvexUrl(input)).toBe(input);
-  });
-  
-  it("handles URLs without convex domain", () => {
-    const input = "https://custom-proxy.example.com";
-    expect(normalizeConvexUrl(input)).toBe(input);
-  });
-});
+import { loadConfig } from "../src/config";
 
 describe("loadConfig with environment variables", () => {
   const originalEnv = { ...process.env };
@@ -50,7 +32,7 @@ describe("loadConfig with environment variables", () => {
     const config = loadConfig();
     
     expect(config).not.toBeNull();
-    expect(config!.convexUrl).toBe("https://test.convex.site"); // normalized
+    expect(config!.convexUrl).toBe("https://test.convex.cloud");
     expect(config!.apiKey).toBe("osk_test123");
     expect(config!.debug).toBe(true);
     expect(config!.autoSync).toBe(true); // default when not "false"

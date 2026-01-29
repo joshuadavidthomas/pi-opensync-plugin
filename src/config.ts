@@ -12,6 +12,7 @@ import {
 } from "@mariozechner/pi-tui";
 import { getSettingsListTheme, DynamicBorder } from "@mariozechner/pi-coding-agent";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { SyncClient } from "./client";
 
 const CONFIG_DIR = join(homedir(), ".config", "pi-opensync-plugin");
 const CONFIG_FILE = join(CONFIG_DIR, "config.json");
@@ -29,13 +30,6 @@ export interface Config {
 }
 
 /**
- * Normalize Convex URL to use .convex.site for HTTP endpoints
- */
-export function normalizeConvexUrl(url: string): string {
-  return url.replace(".convex.cloud", ".convex.site");
-}
-
-/**
  * Load configuration from environment variables or config file
  */
 export function loadConfig(): Config | null {
@@ -44,7 +38,7 @@ export function loadConfig(): Config | null {
 
   if (envUrl && envKey) {
     return {
-      convexUrl: normalizeConvexUrl(envUrl),
+      convexUrl: envUrl,
       apiKey: envKey,
       autoSync: process.env.PI_OPENSYNC_AUTO_SYNC !== "false",
       syncToolCalls: process.env.PI_OPENSYNC_TOOL_CALLS !== "false",
@@ -59,7 +53,7 @@ export function loadConfig(): Config | null {
       const data = readFileSync(CONFIG_FILE, "utf-8");
       const parsed = JSON.parse(data);
       return {
-        convexUrl: normalizeConvexUrl(parsed.convexUrl ?? ""),
+        convexUrl: parsed.convexUrl ?? "",
         apiKey: parsed.apiKey ?? "",
         autoSync: parsed.autoSync ?? true,
         syncToolCalls: parsed.syncToolCalls ?? true,
@@ -67,9 +61,8 @@ export function loadConfig(): Config | null {
         debug: parsed.debug ?? false,
       };
     }
-  } catch (error) {
-    console.error("[pi-opensync] Error loading config:", error);
-  }
+  } catch { } // Config file doesn't exist or is invalid - return null to skip syncing
+
   return null;
 }
 
@@ -150,17 +143,14 @@ export class ConfigSelectorComponent {
   private settingsList: typeof SettingsList.prototype;
   private ctx: ExtensionContext;
   private config: Config;
-  private testConnection: () => Promise<{ success: boolean; error?: string }>;
   private onClose: () => void;
 
   constructor(
     currentConfig: Config | null,
     ctx: ExtensionContext,
-    callbacks: ConfigSelectorCallbacks,
-    testConnection: () => Promise<{ success: boolean; error?: string }>
+    callbacks: ConfigSelectorCallbacks
   ) {
     this.ctx = ctx;
-    this.testConnection = testConnection;
     this.config = currentConfig ?? {
       convexUrl: "https://your-app.convex.cloud",
       apiKey: "osk_",
@@ -284,7 +274,7 @@ export class ConfigSelectorComponent {
       return;
     }
 
-    const testResult = await this.testConnection();
+    const testResult = await new SyncClient(this.config).testConnection();
 
     if (!testResult.success) {
       const proceed = await this.ctx.ui.confirm(
