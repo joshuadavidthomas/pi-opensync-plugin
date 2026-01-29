@@ -1,53 +1,11 @@
 # pi-opensync-plugin
 
-A [pi coding agent](https://github.com/badlogic/pi-mono) extension that syncs sessions to [OpenSync](https://opensync.dev) dashboards.
+A [pi](https://github.com/badlogic/pi-mono) extension that syncs sessions to [OpenSync](https://opensync.dev) dashboards.
 
-## Installation
+## Requirements
 
-1. Clone or copy this extension to your pi extensions directory:
-   ```bash
-   git clone https://github.com/joshuadavidthomas/pi-sync ~/.pi/agent/extensions/pi-opensync-plugin
-   cd ~/.pi/agent/extensions/pi-opensync-plugin
-   bun install
-   ```
-
-2. Configure the extension (see Configuration below)
-
-3. Restart pi - the extension will load automatically
-
-## Configuration
-
-### Interactive Setup
-
-Run `/opensync:config` in pi to interactively configure the extension.
-
-### Manual Configuration
-
-Create `~/.config/pi-opensync-plugin/config.json`:
-
-```json
-{
-  "convexUrl": "https://your-opensync-deployment.convex.cloud",
-  "apiKey": "osk_your_api_key_here",
-  "autoSync": true,
-  "syncToolCalls": false,
-  "syncThinking": false,
-  "debug": false
-}
-```
-
-### Environment Variables
-
-You can also configure via environment variables (takes precedence over config file):
-
-```bash
-export PI_OPENSYNC_CONVEX_URL="https://your-opensync-deployment.convex.cloud"
-export PI_OPENSYNC_API_KEY="osk_your_api_key_here"
-export PI_OPENSYNC_AUTO_SYNC="true"
-export PI_OPENSYNC_TOOL_CALLS="false"
-export PI_OPENSYNC_THINKING="false"
-export PI_OPENSYNC_DEBUG="false"
-```
+- [pi](https://github.com/badlogic/pi-mono) >= 0.50.0
+- [OpenSync](https://github.com/waynesutton/opensync) account ([hosted](https://opensync.dev) or self-hosted) and API key
 
 ## Features
 
@@ -55,22 +13,67 @@ export PI_OPENSYNC_DEBUG="false"
 - **Fork support**: Forked sessions create new OpenSync sessions with `[Fork::parentId]` prefix
 - **Configurable**: Choose what to sync (tool calls, thinking content)
 - **Non-intrusive**: Silent failures, optional debug logging
-- **Status indicator**: Shows sync status in pi's footer
 
-## Configuration Options
+## Installation
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `convexUrl` | (required) | OpenSync Convex deployment URL |
-| `apiKey` | (required) | Your OpenSync API key (osk_...) |
-| `autoSync` | `true` | Enable automatic session syncing |
-| `syncToolCalls` | `false` | Sync tool calls as separate messages |
-| `syncThinking` | `false` | Include thinking/reasoning in messages |
-| `debug` | `false` | Enable debug logging |
 
-## Commands
+- Install as a [pi package](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/packages.md) globally:
 
-- `/opensync:config` - Interactive configuration setup
+  ```bash
+  pi install https://github.com/joshuadavidthomas/pi-opensync-plugin
+  ```
+
+- For project-local installation (auto-installs for teammates):
+
+  ```bash
+  pi install -l https://github.com/joshuadavidthomas/pi-opensync-plugin
+  ```
+
+- To try without installing:
+
+  ```bash
+  pi -e https://github.com/joshuadavidthomas/pi-opensync-plugin
+  ```
+
+- Or you can clone manually:
+
+  ```bash
+  git clone https://github.com/joshuadavidthomas/pi-opensync-plugin ~/.pi/agent/extensions/pi-opensync-plugin
+  ```
+
+## Configuration
+
+Run `/opensync:config` in pi to interactively configure the extension.
+
+Two options are required: `convexUrl` (your OpenSync deployment URL) and `apiKey` (your OpenSync API key).
+
+### Manual Configuration
+
+Create `~/.config/pi-opensync-plugin/config.json`:
+
+```json
+{
+  "apiKey": "osk_your_api_key_here",
+  "autoSync": true,
+  "convexUrl": "https://your-opensync-deployment.convex.cloud",
+  "debug": false,
+  "syncThinking": false,
+  "syncToolCalls": false
+}
+```
+
+### Environment Variables
+
+Environment variables take precedence over config file:
+
+| Variable | Description |
+|----------|-------------|
+| `PI_OPENSYNC_API_KEY` | Your OpenSync API key (osk_...) |
+| `PI_OPENSYNC_AUTO_SYNC` | Enable automatic syncing (default: true) |
+| `PI_OPENSYNC_CONVEX_URL` | OpenSync Convex deployment URL |
+| `PI_OPENSYNC_DEBUG` | Enable debug logging (default: false) |
+| `PI_OPENSYNC_THINKING` | Include thinking content (default: false) |
+| `PI_OPENSYNC_TOOL_CALLS` | Sync tool calls (default: false) |
 
 ## How It Works
 
@@ -93,37 +96,11 @@ This means forked sessions contain the complete conversation history, which is i
 ## Development
 
 ```bash
-# Install dependencies
-bun install
-
-# Run tests
-bun test
-
-# Run tests in watch mode
-bun test --watch
-
-# Type check
-bun run typecheck
+bun install            # Install dependencies
+bun run test           # Run tests
+bun run test:watch     # Run tests in watch mode
+bun run typecheck      # Type check
 ```
-
-### Hot-Reload Workflow
-
-The project includes `.pi/extensions/` symlink which enables hot-reloading during development:
-
-```bash
-# Make changes to src/*.ts files
-# Then in pi, run:
-/reload
-
-# The extension will reload with your changes
-```
-
-If developing in a fresh pi session, just start pi from the project directory and the extension will auto-load.
-
-## Compatibility
-
-- Requires pi coding agent >= 0.50.0
-- Tested with OpenSync API
 
 ## License
 
