@@ -1,6 +1,6 @@
 {
   "name": "pi-opensync-plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Pi extension to sync sessions to OpenSync dashboards",
   "keywords": ["pi-package"],
   "type": "module",
