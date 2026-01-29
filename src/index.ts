@@ -59,7 +59,8 @@ function processBranch(
 
     const msg = entry.message;
 
-    // Skip tool results - we only sync user and assistant messages
+    // Tool results are synced as part of assistant messages (via toolResults property),
+    // not as standalone entries. In live turns, they come from event.toolResults.
     if (msg.role !== "user" && msg.role !== "assistant") continue;
 
     stats.messageCount++;
@@ -122,7 +123,8 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
   let state: SessionState | null = null;
 
   pi.on("session_start", async (_event, ctx) => {
-    // Process existing messages to restore stats (resume scenario)
+    // When resuming a session, the branch already has messages - restore their
+    // accumulated stats so token counts and costs stay accurate
     const { stats } = processBranch(ctx, config);
 
     state = {
@@ -144,7 +146,8 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
   pi.on("session_fork", async (_event, ctx) => {
     const parentSessionId = state?.sessionId;
 
-    // Process existing messages to get stats and build message payloads
+    // Fork creates a new session with the same messages - sync them under the
+    // new session ID and restore accumulated stats
     const { stats, messages } = processBranch(ctx, config);
 
     state = {
