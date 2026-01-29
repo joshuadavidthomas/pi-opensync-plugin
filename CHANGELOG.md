@@ -26,6 +26,8 @@ For multi-package releases, use package names as subsections:
 
 ## [Unreleased]
 
+## [0.2.0]
+
 ### Changed
 
 - Changed model sync to send model name instead of model ID for better readability in OpenSync dashboards
@@ -43,5 +45,6 @@ For multi-package releases, use package names as subsections:
 
 - Josh Thomas <josh@joshthomas.dev> (maintainer)
 
-[unreleased]: https://github.com/joshuadavidthomas/pi-opensync-plugin/compare/v0.1.0...HEAD
+[unreleased]: https://github.com/joshuadavidthomas/pi-opensync-plugin/compare/v0.2.0...HEAD
 [0.1.0]: https://github.com/joshuadavidthomas/pi-opensync-plugin/releases/tag/v0.1.0
+[0.2.0]: https://github.com/joshuadavidthomas/pi-opensync-plugin/releases/tag/v0.2.0
