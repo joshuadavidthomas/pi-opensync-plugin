@@ -104,4 +104,4 @@ bun run typecheck      # Type check
 
 ## License
 
-MIT
+pi-opensync-plugin is licensed under the MIT license. See the [`LICENSE`](LICENSE) file for more information.
