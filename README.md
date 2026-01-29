@@ -1,6 +1,6 @@
 # pi-opensync-plugin
 
-A [pi](https://github.com/badlogic/pi-mono) extension that syncs sessions to [OpenSync](https://opensync.dev) dashboards.
+A [pi coding agent](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent) extension that syncs sessions to [OpenSync](https://opensync.dev) dashboards.
 
 ## Requirements
 
@@ -16,34 +16,41 @@ A [pi](https://github.com/badlogic/pi-mono) extension that syncs sessions to [Op
 
 ## Installation
 
+Install as a [pi package](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/packages.md) globally:
 
-- Install as a [pi package](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/packages.md) globally:
+```bash
+pi install npm:pi-opensync-plugin
+```
 
-  ```bash
-  pi install https://github.com/joshuadavidthomas/pi-opensync-plugin
-  ```
+For project-local installation (auto-installs for teammates), use the `-l` flag when calling `pi install`:
 
-- For project-local installation (auto-installs for teammates):
+```bash
+pi install -l npm:pi-opensync-plugin
+```
 
-  ```bash
-  pi install -l https://github.com/joshuadavidthomas/pi-opensync-plugin
-  ```
+To try without installing, pass the `-e` flag to temporarily add it to your extensions for the duration of a session:
 
-- To try without installing:
+```bash
+pi -e npm:pi-opensync-plugin
+```
 
-  ```bash
-  pi -e https://github.com/joshuadavidthomas/pi-opensync-plugin
-  ```
+For any of the above commands, you can also use the repository URL in place of the NPM package to install:
 
-- Or you can clone manually:
+```bash
+pi install git:github.com/joshuadavidthomas/pi-opensync-plugin
+# or the full URL
+pi install https://github.com/joshuadavidthomas/pi-opensync-plugin
+```
 
-  ```bash
-  git clone https://github.com/joshuadavidthomas/pi-opensync-plugin ~/.pi/agent/extensions/pi-opensync-plugin
-  ```
+For manual installation, clone the repository to any place pi coding agent looks for extensions:
+
+```bash
+git clone https://github.com/joshuadavidthomas/pi-opensync-plugin ~/.pi/agent/extensions/pi-opensync-plugin
+```
 
 ## Configuration
 
-Run `/opensync:config` in pi to interactively configure the extension.
+Once installed, run `/opensync:config` in pi to interactively configure the extension.
 
 Two options are required: `convexUrl` (your OpenSync deployment URL) and `apiKey` (your OpenSync API key).
 
@@ -87,6 +94,7 @@ The extension listens to pi's lifecycle events and syncs data to OpenSync:
 ### Fork Handling
 
 When you fork a session in pi (`/fork`), the extension:
+
 1. Creates a new OpenSync session with title prefix `[Fork::parentId]`
 2. Batch-syncs all existing messages from the fork point
 3. Continues real-time syncing for new messages
