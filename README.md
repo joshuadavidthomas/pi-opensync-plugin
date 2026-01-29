@@ -5,7 +5,7 @@ A [pi](https://github.com/badlogic/pi-mono) extension that syncs sessions to [Op
 ## Requirements
 
 - [pi](https://github.com/badlogic/pi-mono) >= 0.50.0
-- [OpenSync](https://github.com/waynesutton/opensync) account ([hosted](https://opensync.dev) or self-hosted) and API key
+- [OpenSync](https://github.com/waynesutton/opensync) account ([hosted](https://opensync.dev) or [self-hosted](https://www.opensync.dev/docs#requirements)) and API key
 
 ## Features
 
