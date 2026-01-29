@@ -2,6 +2,14 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { SyncClient } from "../src/client";
 import type { SessionData, UserMessageData, AssistantMessageData } from "../src/client";
 import type { Config } from "../src/config";
+import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+
+const mockCtx = (sessionName = "Test Session") =>
+  ({
+    sessionManager: {
+      getSessionName: () => sessionName,
+    },
+  }) as unknown as ExtensionContext;
 
 describe("SyncClient", () => {
   const mockConfig: Config = {
@@ -44,20 +52,20 @@ describe("SyncClient", () => {
         messageCount: 3,
       };
 
-      await client.syncSession(session);
+      await client.syncSession(session, mockCtx());
 
       expect(capturedBody.externalId).toBe("test-123");
       expect(capturedBody.source).toBe("pi");
       expect(capturedBody.projectPath).toBe("/home/user/my-project");
       expect(capturedBody.projectName).toBe("my-project");
-      expect(capturedBody.title).toBe("Untitled");
+      expect(capturedBody.title).toBe("Test Session");
       expect(capturedBody.model).toBe("claude-sonnet-4-5");
       expect(capturedBody.promptTokens).toBe(100);
       expect(capturedBody.completionTokens).toBe(50);
       expect(capturedBody.totalTokens).toBe(150);
     });
 
-    it("includes title when provided", async () => {
+    it("uses session name from context as title", async () => {
       let capturedBody: any = {};
 
       globalThis.fetch = (async (_url: RequestInfo | URL, options?: RequestInit) => {
@@ -65,13 +73,12 @@ describe("SyncClient", () => {
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       }) as typeof fetch;
 
-      await client.syncSession({
-        sessionId: "s1",
-        projectPath: "/path",
-        title: "My Session",
-      });
+      await client.syncSession(
+        { sessionId: "s1", projectPath: "/path" },
+        mockCtx("My Custom Session")
+      );
 
-      expect(capturedBody.title).toBe("My Session");
+      expect(capturedBody.title).toBe("My Custom Session");
     });
 
     it("adds fork prefix when parentSessionId provided", async () => {
@@ -82,12 +89,14 @@ describe("SyncClient", () => {
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       }) as typeof fetch;
 
-      await client.syncSession({
-        sessionId: "fork-456",
-        projectPath: "/path",
-        parentSessionId: "parent-123-456-789",
-        title: "My Session",
-      });
+      await client.syncSession(
+        {
+          sessionId: "fork-456",
+          projectPath: "/path",
+          parentSessionId: "parent-123-456-789",
+        },
+        mockCtx("My Session")
+      );
 
       expect(capturedBody.title).toBe("[Fork::parent-1] My Session");
     });
@@ -100,12 +109,11 @@ describe("SyncClient", () => {
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       }) as typeof fetch;
 
-      await client.syncSession({
-        sessionId: "s1",
-        projectPath: "/path",
-        startedAt: Date.now() - 5000,
-        isFinal: true,
-      });
+      await client.syncSession(
+        { sessionId: "s1", projectPath: "/path", startedAt: Date.now() - 5000 },
+        mockCtx(),
+        true
+      );
 
       expect(capturedBody.durationMs).toBeGreaterThanOrEqual(5000);
       expect(capturedBody.durationMs).toBeLessThan(6000);
@@ -115,7 +123,7 @@ describe("SyncClient", () => {
       globalThis.fetch = (async () =>
         new Response(JSON.stringify({ ok: true }), { status: 200 })) as unknown as typeof fetch;
 
-      const result = await client.syncSession({ sessionId: "test", projectPath: "/path" });
+      const result = await client.syncSession({ sessionId: "test", projectPath: "/path" }, mockCtx());
       expect(result.success).toBe(true);
     });
 
@@ -123,7 +131,7 @@ describe("SyncClient", () => {
       globalThis.fetch = (async () =>
         new Response("Unauthorized", { status: 401 })) as unknown as typeof fetch;
 
-      const result = await client.syncSession({ sessionId: "test", projectPath: "/path" });
+      const result = await client.syncSession({ sessionId: "test", projectPath: "/path" }, mockCtx());
       expect(result.success).toBe(false);
       expect(result.error).toContain("401");
     });
@@ -276,7 +284,7 @@ describe("SyncClient", () => {
 
       await client.syncMessage(message);
 
-      expect(capturedBody.textContent).toBe("<thinking>Let me analyze...</thinking>\nThe answer is 42");
+      expect(capturedBody.textContent).toBe("<thinking>\nLet me analyze...\n</thinking>\n\nThe answer is 42");
       expect(capturedBody.parts).toHaveLength(2);
       expect(capturedBody.parts[0].type).toBe("text");
       expect(capturedBody.parts[1]).toEqual({ type: "thinking", content: "Let me analyze..." });
@@ -349,7 +357,7 @@ describe("SyncClient", () => {
   });
 
   describe("syncBatch", () => {
-    it("sends batch with transformed messages", async () => {
+    it("sends batch with same payload format as syncMessage", async () => {
       let capturedBody: any = {};
 
       globalThis.fetch = (async (_url: RequestInfo | URL, options?: RequestInit) => {
@@ -357,24 +365,41 @@ describe("SyncClient", () => {
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       }) as typeof fetch;
 
+      const userTimestamp = 1706400000000;
+      const assistantTimestamp = 1706400001000;
+
       await client.syncBatch([
-        { role: "user", sessionId: "s1", messageId: "m1", text: "Hello", timestamp: Date.now() },
+        { role: "user", sessionId: "s1", messageId: "m1", text: "Hello", timestamp: userTimestamp },
         {
           role: "assistant",
           sessionId: "s1",
           messageId: "m2",
           content: [{ type: "text", text: "Hi there" }],
           model: "claude-sonnet-4-5",
-          timestamp: Date.now(),
+          timestamp: assistantTimestamp,
+          usage: { input: 10, output: 5 },
         },
       ]);
 
       expect(capturedBody.sessions).toEqual([]);
       expect(capturedBody.messages).toHaveLength(2);
+
+      // User message includes all fields
+      expect(capturedBody.messages[0].sessionExternalId).toBe("s1");
+      expect(capturedBody.messages[0].externalId).toBe("m1");
       expect(capturedBody.messages[0].role).toBe("user");
       expect(capturedBody.messages[0].textContent).toBe("Hello");
+      expect(capturedBody.messages[0].createdAt).toBe(userTimestamp);
+
+      // Assistant message includes all fields (same as syncMessage)
+      expect(capturedBody.messages[1].sessionExternalId).toBe("s1");
+      expect(capturedBody.messages[1].externalId).toBe("m2");
       expect(capturedBody.messages[1].role).toBe("assistant");
       expect(capturedBody.messages[1].textContent).toBe("Hi there");
+      expect(capturedBody.messages[1].model).toBe("claude-sonnet-4-5");
+      expect(capturedBody.messages[1].createdAt).toBe(assistantTimestamp);
+      expect(capturedBody.messages[1].promptTokens).toBe(10);
+      expect(capturedBody.messages[1].completionTokens).toBe(5);
     });
   });
 

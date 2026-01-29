@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext, SessionEntry } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { AssistantMessage, ToolResultMessage } from "@mariozechner/pi-ai";
 import { loadConfig, normalizeConvexUrl, ConfigSelectorComponent } from "./config";
 import { SyncClient } from "./client";
@@ -38,10 +38,13 @@ interface BranchStats {
  * Used when resuming a session or processing a fork to sync existing messages.
  */
 function processBranch(
-  branch: SessionEntry[],
-  sessionId: string,
-  includeThinking: boolean
+  ctx: ExtensionContext,
+  config: { syncThinking: boolean }
 ): { stats: BranchStats; messages: MessageData[] } {
+  const branch = ctx.sessionManager.getBranch();
+  const sessionId = ctx.sessionManager.getSessionId();
+  const includeThinking = config.syncThinking;
+
   const stats: BranchStats = {
     messageCount: 0,
     promptTokens: 0,
@@ -119,17 +122,11 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
   let state: SessionState | null = null;
 
   pi.on("session_start", async (_event, ctx) => {
-    const sessionId = ctx.sessionManager.getSessionId();
-
     // Process existing messages to restore stats (resume scenario)
-    const { stats } = processBranch(
-      ctx.sessionManager.getBranch(),
-      sessionId,
-      config.syncThinking
-    );
+    const { stats } = processBranch(ctx, config);
 
     state = {
-      sessionId,
+      sessionId: ctx.sessionManager.getSessionId(),
       projectPath: ctx.cwd,
       model: ctx.model?.id,
       provider: ctx.model?.provider,
@@ -137,14 +134,7 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
       startedAt: Date.now(),
     };
 
-    if (ctx.hasUI) {
-      ctx.ui.setStatus("pi-opensync", ctx.ui.theme.fg("dim", "● OpenSync"));
-    }
-
-    const result = await client.syncSession({
-      ...state,
-      title: ctx.sessionManager.getSessionName(),
-    });
+    const result = await client.syncSession(state, ctx);
 
     if (!result.success) {
       notifyError(ctx, `Failed to sync session: ${result.error}`);
@@ -153,17 +143,12 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
 
   pi.on("session_fork", async (_event, ctx) => {
     const parentSessionId = state?.sessionId;
-    const sessionId = ctx.sessionManager.getSessionId();
 
     // Process existing messages to get stats and build message payloads
-    const { stats, messages } = processBranch(
-      ctx.sessionManager.getBranch(),
-      sessionId,
-      config.syncThinking
-    );
+    const { stats, messages } = processBranch(ctx, config);
 
     state = {
-      sessionId,
+      sessionId: ctx.sessionManager.getSessionId(),
       parentSessionId,
       projectPath: ctx.cwd,
       model: ctx.model?.id,
@@ -172,42 +157,38 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
       startedAt: Date.now(),
     };
 
-    await client.syncSession({
-      ...state,
-      title: ctx.sessionManager.getSessionName(),
-    });
+    await client.syncSession(state, ctx);
 
     if (messages.length > 0) {
       await client.syncBatch(messages);
     }
 
-    await client.syncSession({
-      ...state,
-      title: ctx.sessionManager.getSessionName(),
-    });
+    await client.syncSession(state, ctx);
   });
 
-  /** Sync final session state on shutdown */
+  /**
+   * Sync final session state on shutdown
+   */
   pi.on("session_shutdown", async (_event, ctx) => {
     if (!state) return;
 
-    await client.syncSession({
-      ...state,
-      title: ctx.sessionManager.getSessionName(),
-      isFinal: true,
-    });
+    await client.syncSession(state, ctx, true);
 
     state = null;
   });
 
-  /** Track model changes for session metadata */
+  /**
+   * Track model changes for session metadata
+   */
   pi.on("model_select", async (event, _ctx) => {
     if (!state) return;
     state.model = event.model.id;
     state.provider = event.model.provider;
   });
 
-  /** Sync user messages as they're sent */
+  /**
+   * Sync user messages as they're sent
+   */
   pi.on("input", async (event, ctx) => {
     if (!state) return;
     if (event.source === "extension") return;
@@ -226,7 +207,9 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
     }
   });
 
-  /** Sync assistant messages and update session stats after each turn */
+  /**
+   * Sync assistant messages and update session stats after each turn
+   */
   pi.on("turn_end", async (event, ctx) => {
     if (!state) return;
     if (event.message.role !== "assistant") return;
@@ -267,10 +250,7 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
       notifyError(ctx, `Failed to sync message: ${msgResult.error}`);
     }
 
-    const sessResult = await client.syncSession({
-      ...state,
-      title: ctx.sessionManager.getSessionName(),
-    });
+    const sessResult = await client.syncSession(state, ctx);
 
     if (!sessResult.success) {
       notifyError(ctx, `Failed to update session: ${sessResult.error}`);
@@ -279,12 +259,11 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
 }
 
 /**
- * Display an error notification and update status bar to show error state.
+ * Show error notification to user.
  */
 function notifyError(ctx: ExtensionContext, message: string) {
   if (ctx.hasUI) {
     ctx.ui.notify(`[OpenSync] ${message}`, "error");
-    ctx.ui.setStatus("pi-opensync", ctx.ui.theme.fg("error", "● Sync error"));
   }
 }
 
@@ -295,10 +274,7 @@ function registerConfigCommand(pi: ExtensionAPI) {
   pi.registerCommand("opensync:config", {
     description: "Configure OpenSync sync settings",
     handler: async (_args, ctx) => {
-      if (!ctx.hasUI) {
-        ctx.ui.notify("Config command requires interactive mode", "error");
-        return;
-      }
+      if (!ctx.hasUI) return;
 
       const currentConfig = loadConfig();
 

@@ -36,13 +36,6 @@ export function normalizeConvexUrl(url: string): string {
 }
 
 /**
- * Get config file path (for display purposes)
- */
-export function getConfigPath(): string {
-  return CONFIG_FILE;
-}
-
-/**
  * Load configuration from environment variables or config file
  */
 export function loadConfig(): Config | null {
@@ -78,16 +71,6 @@ export function loadConfig(): Config | null {
     console.error("[pi-opensync] Error loading config:", error);
   }
   return null;
-}
-
-/**
- * Save configuration to file
- */
-export function saveConfig(config: Config): void {
-  if (!existsSync(CONFIG_DIR)) {
-    mkdirSync(CONFIG_DIR, { recursive: true });
-  }
-  writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
 }
 
 /**
@@ -168,6 +151,7 @@ export class ConfigSelectorComponent {
   private ctx: ExtensionContext;
   private config: Config;
   private testConnection: () => Promise<{ success: boolean; error?: string }>;
+  private onClose: () => void;
 
   constructor(
     currentConfig: Config | null,
@@ -256,16 +240,14 @@ export class ConfigSelectorComponent {
     this.container = new Container();
     this.container.addChild(new DynamicBorder((s: string) => s));
 
+    this.onClose = callbacks.onClose;
+
     this.settingsList = new SettingsList(
       items,
       Math.min(items.length + 2, 15),
       getSettingsListTheme(),
-      (id: string, newValue: string) => {
-        this.handleValueChange(id, newValue);
-      },
-      async () => {
-        await this.handleClose(callbacks.onClose);
-      },
+      this.handleValueChange,
+      this.handleClose,
       { enableSearch: true }
     );
 
@@ -273,7 +255,7 @@ export class ConfigSelectorComponent {
     this.container.addChild(new DynamicBorder((s: string) => s));
   }
 
-  private handleValueChange(id: string, newValue: string): void {
+  private handleValueChange = (id: string, newValue: string): void => {
     const boolValue = newValue === "true";
     switch (id) {
       case "auto-sync":
@@ -289,16 +271,16 @@ export class ConfigSelectorComponent {
         this.config.debug = boolValue;
         break;
     }
-  }
+  };
 
-  private async handleClose(onClose: () => void): Promise<void> {
+  private handleClose = async (): Promise<void> => {
     const save = await this.ctx.ui.confirm(
       "Save Configuration",
       "Save changes to OpenSync configuration?"
     );
 
     if (!save) {
-      onClose();
+      this.onClose();
       return;
     }
 
@@ -311,23 +293,26 @@ export class ConfigSelectorComponent {
       );
       if (!proceed) {
         this.ctx.ui.notify("Configuration not saved", "info");
-        onClose();
+        this.onClose();
         return;
       }
     }
 
     try {
-      saveConfig(this.config);
+      if (!existsSync(CONFIG_DIR)) {
+        mkdirSync(CONFIG_DIR, { recursive: true });
+      }
+      writeFileSync(CONFIG_FILE, JSON.stringify(this.config, null, 2));
       this.ctx.ui.notify(
-        `Config saved to ${getConfigPath()}\n\nRestart pi or use /reload to apply changes.`,
+        `Config saved to ${CONFIG_FILE}\n\nRestart pi or use /reload to apply changes.`,
         "info"
       );
     } catch (error) {
       this.ctx.ui.notify(`Failed to save config: ${error}`, "error");
     }
 
-    onClose();
-  }
+    this.onClose();
+  };
 
   render(width: number): string[] {
     return this.container.render(width);

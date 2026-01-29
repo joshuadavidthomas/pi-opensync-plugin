@@ -1,27 +1,15 @@
-/**
- * OpenSync API Client
- *
- * Handles communication with the OpenSync API endpoints for syncing
- * session metadata and messages. Transforms domain objects into the
- * API payload format expected by OpenSync.
- *
- * Debug logging (when enabled) writes to .pi/opensync-debug.jsonl
- */
-
 import { basename } from "node:path";
 import { appendFileSync } from "node:fs";
+import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { Config } from "./config";
 
-// ============================================================================
-// Public Types - Used by callers to pass domain data
-// ============================================================================
-
-/** Session metadata for syncing to OpenSync */
+/**
+ * Session metadata for syncing to OpenSync
+ */
 export interface SessionData {
   sessionId: string;
   projectPath: string;
   parentSessionId?: string;
-  title?: string;
   model?: string;
   provider?: string;
   promptTokens?: number;
@@ -29,10 +17,11 @@ export interface SessionData {
   cost?: number;
   messageCount?: number;
   startedAt?: number;
-  isFinal?: boolean;
 }
 
-/** User message data for syncing */
+/**
+ * User message data for syncing
+ */
 export interface UserMessageData {
   role: "user";
   sessionId: string;
@@ -41,7 +30,9 @@ export interface UserMessageData {
   timestamp?: number;
 }
 
-/** Assistant message data for syncing */
+/**
+ * Assistant message data for syncing
+ */
 export interface AssistantMessageData {
   role: "assistant";
   sessionId: string;
@@ -56,32 +47,41 @@ export interface AssistantMessageData {
 
 export type MessageData = UserMessageData | AssistantMessageData;
 
-/** Tool result data included with assistant messages */
+/**
+ * Tool result data included with assistant messages
+ */
 export interface ToolResultData {
   toolName: string;
   content: { type: "text"; text: string }[];
 }
 
-/** Result of a sync operation */
+/**
+ * Result of a sync operation
+ */
 export interface SyncResult {
   success: boolean;
   error?: string;
 }
 
-// ============================================================================
-// Internal Types - API payload formats
-// ============================================================================
-
+/**
+ * Text content part from assistant message
+ */
 interface TextContent {
   type: "text";
   text: string;
 }
 
+/**
+ * Thinking/reasoning content part from assistant message
+ */
 interface ThinkingContent {
   type: "thinking";
   thinking: string;
 }
 
+/**
+ * Tool call content part from assistant message
+ */
 interface ToolCallContent {
   type: "toolCall";
   id: string;
@@ -89,8 +89,14 @@ interface ToolCallContent {
   arguments: unknown;
 }
 
+/**
+ * Union of content part types in assistant messages
+ */
 type AssistantContentPart = TextContent | ThinkingContent | ToolCallContent;
 
+/**
+ * API payload format for session sync endpoint
+ */
 interface SessionPayload {
   externalId: string;
   source: "pi";
@@ -107,11 +113,46 @@ interface SessionPayload {
   messageCount?: number;
 }
 
-interface MessagePart {
-  type: string;
-  content: unknown;
+/**
+ * Text part in message payload
+ */
+interface TextPart {
+  type: "text";
+  content: string;
 }
 
+/**
+ * Tool call part in message payload
+ */
+interface ToolCallPart {
+  type: "tool-call";
+  content: { toolName: string; args: unknown };
+}
+
+/**
+ * Tool result part in message payload
+ */
+interface ToolResultPart {
+  type: "tool-result";
+  content: string;
+}
+
+/**
+ * Thinking part in message payload
+ */
+interface ThinkingPart {
+  type: "thinking";
+  content: string;
+}
+
+/**
+ * Structured content part in message payload (tool calls, thinking, etc.)
+ */
+type MessagePart = TextPart | ToolCallPart | ToolResultPart | ThinkingPart;
+
+/**
+ * API payload format for message sync endpoint
+ */
 interface MessagePayload {
   sessionExternalId: string;
   externalId: string;
@@ -142,33 +183,25 @@ export class SyncClient {
     this.debug = config.debug;
   }
 
-  /** Sync multiple messages in a single batch request */
+  /**
+   * Sync multiple messages in a single batch request
+   */
   async syncBatch(messages: MessageData[]): Promise<SyncResult> {
-    const messagePayloads = messages.map((m) => {
-      if (m.role === "user") {
-        return {
-          sessionExternalId: m.sessionId,
-          externalId: m.messageId,
-          role: "user" as const,
-          textContent: m.text,
-        };
-      } else {
-        const textContent = this.extractText(m.content, m.includeThinking ?? false);
-        return {
-          sessionExternalId: m.sessionId,
-          externalId: m.messageId,
-          role: "assistant" as const,
-          textContent: textContent || undefined,
-          model: m.model,
-        };
-      }
-    });
-
+    const messagePayloads = messages.map((m) => this.buildMessagePayload(m));
     return this.request("/sync/batch", { sessions: [], messages: messagePayloads });
   }
 
-  /** Sync a single message (user or assistant) */
+  /**
+   * Sync a single message (user or assistant)
+   */
   async syncMessage(message: MessageData): Promise<SyncResult> {
+    return this.request("/sync/message", this.buildMessagePayload(message));
+  }
+
+  /**
+   * Transform domain message data into API payload format
+   */
+  private buildMessagePayload(message: MessageData): MessagePayload {
     const payload: MessagePayload = {
       sessionExternalId: message.sessionId,
       externalId: message.messageId,
@@ -180,7 +213,17 @@ export class SyncClient {
       payload.textContent = message.text;
     } else {
       const includeThinking = message.includeThinking ?? false;
-      const textContent = this.extractText(message.content, includeThinking);
+
+      // Extract plain text from content parts
+      const textParts: string[] = [];
+      for (const part of message.content) {
+        if (part.type === "text") {
+          textParts.push(part.text);
+        } else if (part.type === "thinking" && includeThinking) {
+          textParts.push(`<thinking>\n${part.thinking}\n</thinking>\n`);
+        }
+      }
+      const textContent = textParts.join("\n");
 
       payload.textContent = textContent || undefined;
       payload.model = message.model;
@@ -194,23 +237,29 @@ export class SyncClient {
       if (parts.length > 0) payload.parts = parts;
     }
 
-    return this.request("/sync/message", payload);
+    return payload;
   }
 
-  /** Sync session metadata (title, model, usage stats, etc.) */
-  async syncSession(session: SessionData): Promise<SyncResult> {
+  /**
+   * Sync session metadata (title, model, usage stats, etc.)
+   */
+  async syncSession(
+    session: SessionData,
+    ctx: ExtensionContext,
+    isFinal = false
+  ): Promise<SyncResult> {
+    let title = ctx.sessionManager.getSessionName() || "Untitled";
+    if (session.parentSessionId) {
+      title = `[Fork::${session.parentSessionId.slice(0, 8)}] ${title}`;
+    }
+
     const payload: SessionPayload = {
       externalId: session.sessionId,
       source: "pi",
       projectPath: session.projectPath,
       projectName: basename(session.projectPath),
+      title,
     };
-
-    let title = session.title || "Untitled";
-    if (session.parentSessionId) {
-      title = `[Fork::${session.parentSessionId.slice(0, 8)}] ${title}`;
-    }
-    payload.title = title;
 
     if (session.model) payload.model = session.model;
     if (session.provider) payload.provider = session.provider;
@@ -223,14 +272,16 @@ export class SyncClient {
 
     if ((session.cost ?? 0) > 0) payload.cost = session.cost;
     if ((session.messageCount ?? 0) > 0) payload.messageCount = session.messageCount;
-    if (session.isFinal && session.startedAt) {
+    if (isFinal && session.startedAt) {
       payload.durationMs = Date.now() - session.startedAt;
     }
 
     return this.request("/sync/session", payload);
   }
 
-  /** Test API connectivity via health endpoint */
+  /**
+   * Test API connectivity via health endpoint
+   */
   async testConnection(): Promise<SyncResult> {
     try {
       const response = await fetch(`${this.siteUrl}/health`);
@@ -241,6 +292,7 @@ export class SyncClient {
       return { success: false, error: message };
     }
   }
+
 
   /**
    * Build message parts array for structured content (tool calls, thinking).
@@ -290,20 +342,9 @@ export class SyncClient {
     return parts;
   }
 
-  /** Extract plain text from assistant content parts */
-  private extractText(content: AssistantContentPart[], includeThinking: boolean): string {
-    const parts: string[] = [];
-    for (const part of content) {
-      if (part.type === "text") {
-        parts.push(part.text);
-      } else if (part.type === "thinking" && includeThinking) {
-        parts.push(`<thinking>${part.thinking}</thinking>`);
-      }
-    }
-    return parts.join("\n");
-  }
-
-  /** Write debug log entry to .pi/opensync-debug.jsonl */
+  /**
+   * Write debug log entry to .pi/opensync-debug.jsonl
+   */
   private log(entry: Record<string, unknown>): void {
     if (!this.debug) return;
     try {
@@ -312,7 +353,9 @@ export class SyncClient {
     } catch { } // Silently fail if we can't write logs
   }
 
-  /** Make authenticated POST request to OpenSync API */
+  /**
+   * Make authenticated POST request to OpenSync API
+   */
   private async request(endpoint: string, data: unknown): Promise<SyncResult> {
     const url = `${this.siteUrl}${endpoint}`;
     this.log({ type: "request", endpoint, payload: data });
