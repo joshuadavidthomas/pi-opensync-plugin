@@ -6,7 +6,7 @@ import {
   Text,
   Spacer,
   Input,
-  getEditorKeybindings,
+  getKeybindings,
   SettingsList,
   type SettingItem,
 } from "@mariozechner/pi-tui";
@@ -103,15 +103,15 @@ function createTextInputSubmenu(
       container.invalidate();
     },
     handleInput(data: string) {
-      const kb = getEditorKeybindings();
-      if (kb.matches(data, "selectConfirm") || data === "\n") {
+      const kb = getKeybindings();
+      if (kb.matches(data, "tui.select.confirm") || data === "\n") {
         const value = input.getValue().trim();
         if (value) {
           onSave(value);
         } else {
           onCancel();
         }
-      } else if (kb.matches(data, "selectCancel")) {
+      } else if (kb.matches(data, "tui.select.cancel")) {
         onCancel();
       } else {
         input.handleInput(data);

@@ -26,6 +26,11 @@ For multi-package releases, use package names as subsections:
 
 ## [Unreleased]
 
+### Changed
+
+- Updated the extension for pi 0.65.0 session lifecycle changes by handling forks from `session_start` instead of the removed `session_fork` event
+- Raised the minimum supported `@mariozechner/pi-coding-agent` version to 0.65.0
+
 ## [0.2.0]
 
 ### Changed

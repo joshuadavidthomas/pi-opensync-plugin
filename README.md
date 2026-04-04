@@ -4,7 +4,7 @@ A [pi coding agent](https://github.com/badlogic/pi-mono/tree/main/packages/codin
 
 ## Requirements
 
-- [pi](https://github.com/badlogic/pi-mono) >= 0.50.0
+- [pi](https://github.com/badlogic/pi-mono) >= 0.65.0
 - [OpenSync](https://github.com/waynesutton/opensync) account ([hosted](https://opensync.dev) or [self-hosted](https://www.opensync.dev/docs#requirements)) and API key
 
 ## Features

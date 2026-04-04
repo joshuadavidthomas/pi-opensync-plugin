@@ -1,3 +1,4 @@
+import { SessionManager } from "@mariozechner/pi-coding-agent";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { AssistantMessage, ToolResultMessage } from "@mariozechner/pi-ai";
 import { loadConfig, ConfigSelectorComponent } from "./config";
@@ -35,7 +36,7 @@ interface BranchStats {
 
 /**
  * Process existing messages in a branch to extract stats and build message payloads.
- * Used when resuming a session or processing a fork to sync existing messages.
+ * Fork handling uses the returned messages to backfill conversation history.
  */
 function processBranch(
   ctx: ExtensionContext,
@@ -109,6 +110,19 @@ function processBranch(
 }
 
 /**
+ * Read the parent session ID from a previous session file.
+ */
+function getSessionIdFromFile(sessionFile?: string): string | undefined {
+  if (!sessionFile) return;
+
+  try {
+    return SessionManager.open(sessionFile).getSessionId();
+  } catch {
+    return;
+  }
+}
+
+/**
  * Main plugin entry point. Registers event handlers for session lifecycle
  * and message events to sync with OpenSync.
  */
@@ -122,37 +136,17 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
   const client = new SyncClient(config);
   let state: SessionState | null = null;
 
-  pi.on("session_start", async (_event, ctx) => {
-    // When resuming a session, the branch already has messages - restore their
-    // accumulated stats so token counts and costs stay accurate
-    const { stats } = processBranch(ctx, config);
-
-    state = {
-      sessionId: ctx.sessionManager.getSessionId(),
-      projectPath: ctx.cwd,
-      model: ctx.model?.name,
-      provider: ctx.model?.provider?.replace(/-/g, " "),
-      ...stats,
-      startedAt: Date.now(),
-    };
-
-    const result = await client.syncSession(state, ctx);
-
-    if (!result.success) {
-      notifyError(ctx, `Failed to sync session: ${result.error}`);
-    }
-  });
-
-  pi.on("session_fork", async (_event, ctx) => {
-    const parentSessionId = state?.sessionId;
-
-    // Fork creates a new session with the same messages - sync them under the
-    // new session ID and restore accumulated stats
+  pi.on("session_start", async (event, ctx) => {
+    // When resuming or forking a session, the branch already has messages.
+    // Restore accumulated stats so token counts and costs stay accurate.
     const { stats, messages } = processBranch(ctx, config);
+    const parentSessionFile = event.reason === "fork"
+      ? event.previousSessionFile ?? ctx.sessionManager.getHeader()?.parentSession
+      : undefined;
 
     state = {
       sessionId: ctx.sessionManager.getSessionId(),
-      parentSessionId,
+      parentSessionId: getSessionIdFromFile(parentSessionFile),
       projectPath: ctx.cwd,
       model: ctx.model?.name,
       provider: ctx.model?.provider?.replace(/-/g, " "),
@@ -160,13 +154,29 @@ export default function piOpensyncPlugin(pi: ExtensionAPI) {
       startedAt: Date.now(),
     };
 
-    await client.syncSession(state, ctx);
+    const sessionResult = await client.syncSession(state, ctx);
 
-    if (messages.length > 0) {
-      await client.syncBatch(messages);
+    if (!sessionResult.success) {
+      notifyError(ctx, `Failed to sync session: ${sessionResult.error}`);
+      return;
     }
 
-    await client.syncSession(state, ctx);
+    if (event.reason !== "fork" || messages.length === 0) {
+      return;
+    }
+
+    const batchResult = await client.syncBatch(messages);
+
+    if (!batchResult.success) {
+      notifyError(ctx, `Failed to sync forked messages: ${batchResult.error}`);
+      return;
+    }
+
+    const finalResult = await client.syncSession(state, ctx);
+
+    if (!finalResult.success) {
+      notifyError(ctx, `Failed to update forked session: ${finalResult.error}`);
+    }
   });
 
   /**
