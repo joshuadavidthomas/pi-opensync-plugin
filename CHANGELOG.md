@@ -26,6 +26,8 @@ For multi-package releases, use package names as subsections:
 
 ## [Unreleased]
 
+## [0.3.0]
+
 ### Changed
 
 - Updated the extension for pi 0.65.0 session lifecycle changes by handling forks from `session_start` instead of the removed `session_fork` event
