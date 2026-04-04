@@ -48,8 +48,12 @@ jobs:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
+      # Pin a known-good npm for trusted publishing.
+      # `npm install -g npm@latest` currently hits an upstream self-upgrade bug in CI:
+      # https://github.com/npm/cli/pull/9152
+      # https://github.com/nodejs/node/issues/62425
       - name: Update npm
-        run: npm install -g npm@latest
+        run: npm install -g npm@11.5.2
 
       - name: Publish to npm
         run: npm publish
